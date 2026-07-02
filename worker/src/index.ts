@@ -110,6 +110,7 @@ export default {
       return handleWs(request, env, url, origin, allowed);
     }
 
-    return new Response('bulunamadi', { status: 404 });
+    // API/WS disindaki her sey statik site (Workers assets)
+    return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
