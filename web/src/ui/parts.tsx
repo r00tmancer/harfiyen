@@ -62,8 +62,16 @@ function Heart({ filled, size = 18 }: { filled: boolean; size?: number }) {
   );
 }
 
-// 3 can yuvasi; can gidince kalan dizi sallanir
-export function Hearts({ lives, size = 18 }: { lives: number; size?: number }) {
+// can yuvalari (varsayilan 3); can gidince kalan dizi sallanir
+export function Hearts({
+  lives,
+  size = 18,
+  max = ZINCIR_LIVES,
+}: {
+  lives: number;
+  size?: number;
+  max?: number;
+}) {
   const wrap = useRef<HTMLDivElement>(null);
   const prev = useRef(lives);
   useEffect(() => {
@@ -72,7 +80,7 @@ export function Hearts({ lives, size = 18 }: { lives: number; size?: number }) {
   }, [lives]);
   return (
     <div ref={wrap} className="flex gap-0.5" aria-label={`${lives} can`}>
-      {Array.from({ length: ZINCIR_LIVES }, (_, i) => (
+      {Array.from({ length: max }, (_, i) => (
         <span key={i} className="inline-flex">
           <Heart filled={i < lives} size={size} />
         </span>

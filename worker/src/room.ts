@@ -35,6 +35,7 @@ import type { PlayerState, RoomCtx, RoomState } from './game/state';
 import * as sayi from './game/modes/sayi';
 import * as zincir from './game/modes/zincir';
 import * as uzun from './game/modes/uzun';
+import * as bom from './game/modes/bom';
 import type { Env } from './env';
 import wordsRaw from './data/words.txt';
 import pairsJson from './data/pairs.json';
@@ -44,7 +45,7 @@ const CLEANUP_MS = 10 * 60_000;
 const STATE_KEY = 'state';
 const FALLBACK_NICK = 'Oyuncu';
 
-const MODES: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun'];
+const MODES: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom'];
 function isGameMode(x: unknown): x is GameMode {
   return typeof x === 'string' && (MODES as string[]).includes(x);
 }
@@ -130,6 +131,7 @@ export class GameRoom extends DurableObject<Env> {
       sayi: null,
       zincir: null,
       uzun: null,
+      bom: null,
     };
     await this.ctx.storage.setAlarm(Date.now() + CLEANUP_MS);
     await this.save(state);
@@ -243,6 +245,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'guess':
         await sayi.onGuess(this.mc(), state, player, msg.value);
         break;
+      case 'bom_press':
+        await bom.onPress(this.mc(), state, player, msg.kind);
+        break;
       case 'submit_word':
         if (state.mode === 'zincir') await zincir.onSubmit(this.mc(), state, player, ws, msg.word);
         else if (state.mode === 'uzun') await uzun.onSubmit(this.mc(), state, player, ws, msg.word);
@@ -284,6 +289,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'uzun':
         await uzun.onJoker(this.mc(), state, player);
         break;
+      case 'bom':
+        await bom.onJoker(this.mc(), state, player);
+        break;
     }
   }
 
@@ -310,6 +318,9 @@ export class GameRoom extends DurableObject<Env> {
         break;
       case 'zincir':
         await zincir.startMatch(this.mc(), state);
+        break;
+      case 'bom':
+        await bom.startMatch(this.mc(), state);
         break;
     }
   }
@@ -421,6 +432,7 @@ export class GameRoom extends DurableObject<Env> {
       state.sayi = null;
       state.zincir = null;
       state.uzun = null;
+      state.bom = null;
       // mod rovansta korunur; her mod kendi durumunu bastan kurar
       await this.startMode(state);
       return;
@@ -438,6 +450,7 @@ export class GameRoom extends DurableObject<Env> {
     state.sayi = null;
     state.zincir = null;
     state.uzun = null;
+    state.bom = null;
     for (const p of state.players) p.pickedLetter = null;
     state.deadline = Date.now() + PICK_MS;
     state.alarmPurpose = 'phase';
@@ -513,6 +526,7 @@ export class GameRoom extends DurableObject<Env> {
       case 'countdown':
         if (state.mode === 'uzun') await uzun.startRace(this.mc(), state);
         else if (state.mode === 'zincir') await zincir.startTurn(this.mc(), state);
+        else if (state.mode === 'bom') await bom.startTurn(this.mc(), state);
         else await this.startRacing(state); // harf
         break;
       case 'racing': {
@@ -535,6 +549,9 @@ export class GameRoom extends DurableObject<Env> {
         break;
       case 'zincir_turn':
         await zincir.onBoom(this.mc(), state);
+        break;
+      case 'bom_turn':
+        await bom.onTimeout(this.mc(), state);
         break;
       case 'uzun_race':
         await uzun.onRaceDeadline(this.mc(), state);
@@ -625,6 +642,7 @@ export class GameRoom extends DurableObject<Env> {
       state.sayi ??= null;
       state.zincir ??= null;
       state.uzun ??= null;
+      state.bom ??= null;
     }
     return state;
   }
@@ -706,6 +724,16 @@ export class GameRoom extends DurableObject<Env> {
 
     const uzunSnap = state.uzun ? { submitted: state.uzun.submitted } : null;
 
+    // Bom: gizli alan yok; sunucu durumu oldugu gibi gorunur.
+    const bomSnap = state.bom
+      ? {
+          lives: state.bom.lives,
+          current: state.bom.current,
+          turnMs: state.bom.turnMs,
+          insured: state.bom.insured,
+        }
+      : null;
+
     return {
       code: state.code,
       mode: state.mode,
@@ -731,6 +759,7 @@ export class GameRoom extends DurableObject<Env> {
       sayi: sayiSnap,
       zincir: zincirSnap,
       uzun: uzunSnap,
+      bom: bomSnap,
     };
   }
 }

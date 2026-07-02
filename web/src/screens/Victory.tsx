@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ZINCIR_LIVES } from '@harfiyen/shared';
+import { BOM_LIVES, ZINCIR_LIVES } from '@harfiyen/shared';
 import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
@@ -47,8 +47,16 @@ function finalScoreOf(snap: RoomSnapshot, p: PlayerPublic): number {
   return p.score;
 }
 
+// zincir/bom: skorun yerine kalan can gosterilir
+function livesOf(snap: RoomSnapshot, p: PlayerPublic): number | null {
+  if (snap.mode === 'zincir') return snap.zincir?.lives[p.id] ?? ZINCIR_LIVES;
+  if (snap.mode === 'bom') return snap.bom?.lives[p.id] ?? BOM_LIVES;
+  return null;
+}
+
 // oyuncu sutunu: buyuk sayi + moda ozel gosterge (madalya/kalp)
 function PlayerScore({ snap, p, idx }: { snap: RoomSnapshot; p: PlayerPublic; idx: 0 | 1 }) {
+  const lives = livesOf(snap, p);
   return (
     <div className="flex flex-col items-center gap-1">
       <Avatar
@@ -58,8 +66,8 @@ function PlayerScore({ snap, p, idx }: { snap: RoomSnapshot; p: PlayerPublic; id
         className={p.connected ? '' : 'grayed'}
       />
       <p className="font-display text-sm font-bold">{p.nick}</p>
-      {snap.mode === 'zincir' ? (
-        <Hearts lives={snap.zincir?.lives[p.id] ?? ZINCIR_LIVES} size={20} />
+      {lives !== null ? (
+        <Hearts lives={lives} size={20} max={snap.mode === 'bom' ? BOM_LIVES : ZINCIR_LIVES} />
       ) : (
         <p className="font-display text-4xl font-extrabold" style={{ color: PLAYER_CSS[idx].dark }}>
           {finalScoreOf(snap, p)}

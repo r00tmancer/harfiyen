@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  BOM_LIVES,
   JOKER_FREEZE_MS,
   PICK_MS,
   RACE_MS,
@@ -16,17 +17,20 @@ import { IconSnowflake, IconSwap } from '../ui/icons';
 import { MODE_META } from '../ui/modes';
 import { Hearts, MedalDots, PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/parts';
 import { useRemaining, up } from '../hooks';
-import { acceptPunch, dropIn, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
+import { acceptPunch, dropIn, microShake, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
 import { burst, paletteFor } from '../fx/confetti';
 import { SayiPick, SayiRoundEnd, SayiTurn } from './modes/SayiGame';
 import { ZincirTurn } from './modes/ZincirGame';
 import { UzunRace, UzunReveal } from './modes/UzunGame';
+import { BomTurn } from './modes/BomGame';
 
-// skor gostergesi moda gore: harf/uzun yildiz, sayi madalya, zincir kalp
+// skor gostergesi moda gore: harf/uzun yildiz, sayi madalya, zincir/bom kalp
 function ScoreGauge({ snap, p }: { snap: RoomSnapshot; p: PlayerPublic }) {
   if (snap.mode === 'sayi') return <MedalDots wins={snap.sayi?.roundWins[p.id] ?? 0} size={16} />;
   if (snap.mode === 'zincir')
     return <Hearts lives={snap.zincir?.lives[p.id] ?? ZINCIR_LIVES} size={16} />;
+  if (snap.mode === 'bom')
+    return <Hearts lives={snap.bom?.lives[p.id] ?? BOM_LIVES} size={16} max={BOM_LIVES} />;
   return <Stars score={p.score} size={17} />;
 }
 
@@ -478,9 +482,11 @@ function RoundEnd({ snap }: { snap: RoomSnapshot }) {
 export default function Game() {
   const snapshot = useStore((s) => s.snapshot);
   const zincirBoom = useStore((s) => s.zincirBoom);
+  const lastBom = useStore((s) => s.lastBom);
   const uzunReveal = useStore((s) => s.uzunReveal);
   const rootRef = useRef<HTMLDivElement>(null);
   const prevBoomSeq = useRef(0);
+  const prevBomSeq = useRef(0);
   // bomba patlamasi: kisa flas + yikama (patlayan bensem toz pembe, rakipse mavi)
   const [boomFx, setBoomFx] = useState<{ mine: boolean; key: number } | null>(null);
 
@@ -493,6 +499,24 @@ export default function Game() {
     const id = window.setTimeout(() => setBoomFx(null), 1200);
     return () => window.clearTimeout(id);
   }, [zincirBoom]);
+
+  // bom modu: dogru BOM mikro sarsinti; hata/timeout tam sarsinti + flas + yikama
+  // (sigorta kurtardiysa patlama efekti yok, rozet BomTurn icinde)
+  useEffect(() => {
+    if (!lastBom || lastBom.seq === prevBomSeq.current) return;
+    prevBomSeq.current = lastBom.seq;
+    if (lastBom.ok) {
+      if (lastBom.kind === 'bom') microShake(rootRef.current);
+      return;
+    }
+    if (lastBom.insured) return;
+    shake(rootRef.current);
+    const you = useStore.getState().snapshot?.you;
+    // hatayi yapan bensem toz pembe, rakipse mavi (zincir ile ayni dil)
+    setBoomFx({ mine: lastBom.by !== you, key: 100000 + lastBom.seq });
+    const id = window.setTimeout(() => setBoomFx(null), 1200);
+    return () => window.clearTimeout(id);
+  }, [lastBom]);
 
   if (!snapshot) return null;
   const mode = snapshot.mode;
@@ -508,7 +532,7 @@ export default function Game() {
       <ScoreBar snap={snapshot} />
       <div className="flex items-center gap-2 self-center">
         <div className="chip chip-soft">
-          {mode === 'zincir' ? 'Halka' : 'Raunt'} {snapshot.round}
+          {mode === 'zincir' ? 'Halka' : mode === 'bom' ? 'Sayı' : 'Raunt'} {snapshot.round}
         </div>
         <div className="chip" style={{ background: 'color-mix(in srgb, var(--grape) 22%, #fff)' }}>
           {MODE_META[mode].name}
@@ -520,6 +544,7 @@ export default function Game() {
       {snapshot.phase === 'sayi_pick' && <SayiPick snap={snapshot} />}
       {snapshot.phase === 'sayi_turn' && <SayiTurn snap={snapshot} />}
       {snapshot.phase === 'zincir_turn' && <ZincirTurn snap={snapshot} />}
+      {snapshot.phase === 'bom_turn' && <BomTurn snap={snapshot} />}
       {snapshot.phase === 'uzun_race' && <UzunRace snap={snapshot} />}
       {snapshot.phase === 'round_end' &&
         (mode === 'sayi' ? (

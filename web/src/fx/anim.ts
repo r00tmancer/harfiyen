@@ -113,6 +113,21 @@ export function shake(el: Element | null): void {
   });
 }
 
+// dogru BOM: kisa mikro sarsinti (tam patlama shake'inden hafif)
+export function microShake(el: Element | null): void {
+  if (!el || reducedMotion()) return;
+  gsap.to(el, {
+    keyframes: [
+      { x: -6, y: 3, duration: 0.045 },
+      { x: 5, y: -3, duration: 0.045 },
+      { x: -3, y: 2, duration: 0.045 },
+      { x: 0, y: 0, duration: 0.06 },
+    ],
+    ease: 'power1.inOut',
+    clearProps: 'x,y',
+  });
+}
+
 // uzun kelime karti: rotateY ile acilis (flip)
 export function flipIn(el: Element | null, delay = 0): void {
   if (!el || reducedMotion()) return;

@@ -1,5 +1,8 @@
 // Saf oyun mantigi — veri dosyasi import etmez, sozluk/cift sayilari disaridan verilir.
 import {
+  BOM_DECAY_MS,
+  BOM_MIN_MS,
+  BOM_START_MS,
   JOKER_PER_ROUNDS,
   MIN_WORD_LEN,
   SAYI_BAND_ILIK,
@@ -7,6 +10,7 @@ import {
   SAYI_BAND_SICAK,
   ZINCIR_DECAY_MS,
   ZINCIR_MIN_MS,
+  isBom,
   matchesPattern,
   normalizeTr,
 } from '@harfiyen/shared';
@@ -133,6 +137,68 @@ export function nextRequiredLetter(word: string, hasStart: (letter: string) => b
     if (hasStart(chars[i])) return chars[i];
   }
   return chars[chars.length - 1] ?? word;
+}
+
+// ---- 7 Bom saf mantigi ----
+
+// Her sayida tur suresi kisalir ama tabana (BOM_MIN_MS) inmez.
+export function decayBomMs(current: number): number {
+  return Math.max(BOM_MIN_MS, current - BOM_DECAY_MS);
+}
+
+export interface BomOutcome {
+  ok: boolean; // dogru hamle miydi
+  insuredUsed: boolean; // hata sigortayla mi affedildi
+  lifeLost: boolean; // can gitti mi
+  next: number; // siradaki sayi (dogruysa +1, degilse degismez)
+  turnMs: number; // yeni tur suresi (dogruysa decay, degilse tabana/basa sifirlanir)
+  livesAfter: number; // hamleyi yapanin kalan cani
+  matchEnd: boolean; // can 0'a dustu mu
+}
+
+// Bir basisin (veya sure dolmasinin) sonucu. kind 'timeout' her zaman yanlistir.
+// Dogru: (kind==='bom') === isBom(current). Yanlista once sigorta, yoksa can gider.
+export function bomPress(opts: {
+  current: number;
+  kind: 'number' | 'bom' | 'timeout';
+  insured: boolean; // hamleyi yapan sigortali mi
+  lives: number; // hamleyi yapanin mevcut cani
+  turnMs: number; // mevcut tur suresi
+}): BomOutcome {
+  const correct = opts.kind !== 'timeout' && (opts.kind === 'bom') === isBom(opts.current);
+  if (correct) {
+    return {
+      ok: true,
+      insuredUsed: false,
+      lifeLost: false,
+      next: opts.current + 1,
+      turnMs: decayBomMs(opts.turnMs),
+      livesAfter: opts.lives,
+      matchEnd: false,
+    };
+  }
+  // Yanlis (veya sure doldu): once sigorta affeder, sayi ilerlemez, sure basa doner.
+  if (opts.insured) {
+    return {
+      ok: false,
+      insuredUsed: true,
+      lifeLost: false,
+      next: opts.current,
+      turnMs: BOM_START_MS,
+      livesAfter: opts.lives,
+      matchEnd: false,
+    };
+  }
+  const livesAfter = Math.max(0, opts.lives - 1);
+  return {
+    ok: false,
+    insuredUsed: false,
+    lifeLost: true,
+    next: opts.current,
+    turnMs: BOM_START_MS,
+    livesAfter,
+    matchEnd: livesAfter <= 0,
+  };
 }
 
 // ---- En Uzun Kelime saf mantigi ----

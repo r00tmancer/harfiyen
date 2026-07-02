@@ -1,10 +1,10 @@
 import type { ComponentType } from 'react';
 import type { SVGProps } from 'react';
 import type { GameMode } from '@harfiyen/shared';
-import { IconBomb, IconRuler, IconTarget, IconTilesDuo } from './icons';
+import { IconBomb, IconBurst, IconRuler, IconTarget, IconTilesDuo } from './icons';
 
 // mod tanitim metinleri + ikonlari (lobi karti, oyun basligi, zafer ekrani)
-export const MODE_ORDER: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun'];
+export const MODE_ORDER: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom'];
 
 export interface ModeMeta {
   name: string;
@@ -37,5 +37,11 @@ export const MODE_META: Record<GameMode, ModeMeta> = {
     desc: 'Tek hakla en uzun kelimeyi yazan raundu alır.',
     joker: 'Joker: Çifte Şans — ikinci hak',
     Icon: IconRuler,
+  },
+  bom: {
+    name: 'Bom',
+    desc: "Sırayla say: 7'nin katı ve içinde 7 olan sayıda BOM de!",
+    joker: 'Joker: Sigorta — bir hatayı affeder',
+    Icon: IconBurst,
   },
 };

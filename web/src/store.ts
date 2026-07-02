@@ -105,6 +105,17 @@ interface HarfiyenStore {
   lastZincir: { by: string; word: string; seq: number } | null;
   zincirBoom: { loser: string; seq: number } | null;
 
+  // ---- bom ----
+  // seq: her sonucta artar, animasyonlar tam-bir-kez tetiklenir
+  lastBom: {
+    by: string;
+    value: number;
+    kind: 'number' | 'bom' | 'timeout';
+    ok: boolean;
+    insured: boolean;
+    seq: number;
+  } | null;
+
   // ---- en uzun kelime ----
   myUzunTries: { word: string; rejected: boolean }[]; // bu raundda gonderdiklerim
   uzunExtra: boolean; // cifte sans jokerini bu raund kullandim mi
@@ -152,6 +163,7 @@ const roomDefaults = {
   thermoArmedBy: null as string | null,
   lastZincir: null,
   zincirBoom: null,
+  lastBom: null,
   myUzunTries: [] as { word: string; rejected: boolean }[],
   uzunExtra: false,
   uzunLocked: null,
@@ -222,6 +234,7 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               patch.finalWord = null;
               patch.lastZincir = null;
               patch.zincirBoom = null;
+              patch.lastBom = null;
               patch.uzunReveal = null;
             }
             if (s.phase === 'picking') {
@@ -433,6 +446,42 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
           return patch;
         }
 
+        // ---- bom ----
+        case 'bom_result': {
+          if (!st.snapshot) return {};
+          const s = st.snapshot;
+          // her sonucta (dogru/yanlis/timeout) sira rakibe gecer
+          const other = s.players.find((p) => p.id !== msg.by)?.id ?? s.turn;
+          return {
+            lastBom: {
+              by: msg.by,
+              value: msg.value,
+              kind: msg.kind,
+              ok: msg.ok,
+              insured: msg.insured,
+              seq: (st.lastBom?.seq ?? 0) + 1,
+            },
+            snapshot: {
+              ...s,
+              round: msg.next, // round = sayilacak sayi (UI ust bilgide gosterir)
+              turn: other,
+              deadline: Date.now() + msg.turnMs, // sunucu snapshot'i gelince kesinlesir
+              bom: s.bom
+                ? {
+                    ...s.bom,
+                    lives: msg.lives,
+                    current: msg.next,
+                    turnMs: msg.turnMs,
+                    // sigorta hatayi affettiyse tuketilir
+                    insured: msg.insured
+                      ? { ...s.bom.insured, [msg.by]: false }
+                      : s.bom.insured,
+                  }
+                : s.bom,
+            },
+          };
+        }
+
         // ---- en uzun kelime ----
         case 'uzun_locked': {
           const patch: Partial<HarfiyenStore> = {
@@ -507,6 +556,13 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
           }
           // cifte sans: bu raund icin +1 gonderim hakki
           if (msg.kind === 'cifte_sans' && msg.by === s.you) patch.uzunExtra = true;
+          // sigorta: kullananin bir sonraki hatasi affedilir
+          if (msg.kind === 'sigorta' && snap.bom) {
+            snap = {
+              ...snap,
+              bom: { ...snap.bom, insured: { ...snap.bom.insured, [msg.by]: true } },
+            };
+          }
           patch.snapshot = snap;
           return patch;
         }

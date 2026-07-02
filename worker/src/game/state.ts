@@ -41,6 +41,14 @@ export interface UzunServer {
   submitted: Record<string, boolean>; // pid -> kilitlendi mi (hak kalmadi)
 }
 
+// 7 Bom: gizli alan yok; snapshot'taki BomState ile ayni sekil.
+export interface BomServer {
+  lives: Record<string, number>; // pid -> kalan can
+  current: number; // siradaki soylenecek sayi (ikisi de gorur)
+  turnMs: number; // bu turun suresi (gitgide kisalir)
+  insured: Record<string, boolean>; // pid -> sigorta jokeri aktif mi (bir hatayi affeder)
+}
+
 export interface RoomState {
   code: string;
   mode: GameMode;
@@ -60,6 +68,7 @@ export interface RoomState {
   sayi: SayiServer | null;
   zincir: ZincirServer | null;
   uzun: UzunServer | null;
+  bom: BomServer | null;
 }
 
 // Mod isleyicilerine verilen dar baglam. GameRoom bu metotlari saglar; boylece

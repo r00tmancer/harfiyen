@@ -16,8 +16,19 @@ export const JOKER_FREEZE_MS = 5_000; // buz jokeri: rakibin yazma alanı bu kad
 export const JOKER_PER_ROUNDS = 5; // her 5 raundluk blok için 1 joker hakkı (1. ve 6. raundda dolar)
 
 // ---- Oyun modları ----
-export type GameMode = 'harf' | 'sayi' | 'zincir' | 'uzun';
+export type GameMode = 'harf' | 'sayi' | 'zincir' | 'uzun' | 'bom';
 export const DEFAULT_MODE: GameMode = 'harf';
+
+// Bom (7 Bom): sırayla say, 7'nin katı veya içinde 7 geçen sayıda BOM de
+export const BOM_LIVES = 3;
+export const BOM_DIGIT = 7;
+export const BOM_START_MS = 6_000; // ilk turların süresi
+export const BOM_MIN_MS = 2_500; // taban süre
+export const BOM_DECAY_MS = 150; // her sayıda süre bu kadar kısalır
+// Bir sayıda BOM denmesi gerekiyor mu?
+export function isBom(n: number): boolean {
+  return n % BOM_DIGIT === 0 || String(n).includes(String(BOM_DIGIT));
+}
 
 // Sayı Avı
 export const SAYI_MIN = 1;
@@ -41,12 +52,13 @@ export const UZUN_ROUND_MS = 30_000; // tek gönderimlik yarış süresi
 export const UZUN_TARGET = 5; // maçı kazanmak için puan
 
 // Mod başına joker türü (UI metni istemcide)
-export type JokerKind = 'buz' | 'termometre' | 'pas' | 'cifte_sans';
+export type JokerKind = 'buz' | 'termometre' | 'pas' | 'cifte_sans' | 'sigorta';
 export const MODE_JOKER: Record<GameMode, JokerKind> = {
   harf: 'buz',
   sayi: 'termometre',
   zincir: 'pas',
   uzun: 'cifte_sans',
+  bom: 'sigorta', // bir sonraki hatanı affeder (can gitmez)
 };
 
 export const TR_LETTERS = [
@@ -89,6 +101,7 @@ export type Phase =
   | 'sayi_turn' // (sayi) sıradaki oyuncu tahmin ediyor
   | 'zincir_turn' // (zincir) sıradaki oyuncu kelime yazıyor, bomba tıkırdıyor
   | 'uzun_race' // (uzun) tek gönderimlik uzun kelime yarışı
+  | 'bom_turn' // (bom) sıradaki oyuncu sayıya ya da BOM'a basıyor
   | 'round_end' // raund sonucu gösteriliyor
   | 'match_end'; // maç bitti
 
@@ -111,6 +124,13 @@ export interface ZincirState {
 
 export interface UzunState {
   submitted: Record<string, boolean>; // kim kelimesini kilitledi (kelime gizli)
+}
+
+export interface BomState {
+  lives: Record<string, number>;
+  current: number; // sıradaki söylenecek sayı (ikisi de görür)
+  turnMs: number; // bu turun süresi (gitgide kısalır)
+  insured: Record<string, boolean>; // sigorta jokeri aktif mi (bir hatayı affeder)
 }
 
 export interface PlayerPublic {
@@ -136,10 +156,11 @@ export interface RoomSnapshot {
   usedWords: string[]; // bu maçta kabul edilmiş kelimeler (tekrar kullanılamaz)
   winner: string | null; // match_end'de kazanan oyuncu id'i
   frozenUntil: Record<string, number>; // (harf) oyuncu id -> buz jokerinin bittiği an
-  turn: string | null; // (sayi/zincir) sıra hangi oyuncuda
+  turn: string | null; // (sayi/zincir/bom) sıra hangi oyuncuda
   sayi: SayiState | null;
   zincir: ZincirState | null;
   uzun: UzunState | null;
+  bom: BomState | null;
 }
 
 // ---- Mesajlar: istemci -> sunucu ----
@@ -150,6 +171,7 @@ export type ClientMsg =
   | { t: 'submit_word'; word: string } // harf/zincir/uzun modlarında kelime gönderimi
   | { t: 'pick_number'; value: number } // (sayi) gizli sayı seçimi
   | { t: 'guess'; value: number } // (sayi) sıradaki tahmin
+  | { t: 'bom_press'; kind: 'number' | 'bom' } // (bom) sıradaki oyuncunun seçimi
   | { t: 'use_joker' } // moda özel joker (MODE_JOKER)
   | { t: 'rematch' };
 
@@ -186,6 +208,18 @@ export type ServerMsg =
   // Kelime Zinciri
   | { t: 'zincir_word'; by: string; word: string; nextLetter: string; turnMs: number } // kabul edilen halka
   | { t: 'zincir_boom'; loser: string; lives: Record<string, number>; nextLetter: string | null } // süre doldu, can gitti
+  // Bom
+  | {
+      t: 'bom_result';
+      by: string;
+      value: number; // basılan andaki sayı
+      kind: 'number' | 'bom' | 'timeout';
+      ok: boolean; // doğru hamle miydi
+      insured: boolean; // hata sigortayla affedildi mi
+      lives: Record<string, number>;
+      next: number; // sıradaki sayı
+      turnMs: number;
+    }
   // En Uzun Kelime
   | { t: 'uzun_locked'; by: string } // oyuncu kelimesini kilitledi (kelime gizli)
   | {

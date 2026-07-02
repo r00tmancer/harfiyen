@@ -135,6 +135,26 @@ export function IconRuler({ size = 22, ...props }: { size?: number } & SVGProps<
   );
 }
 
+// patlama yildizi, icinde 7: bom modu
+export function IconBurst({ size = 22, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2l2.2 4.6 4.9-1.7-1.7 4.9L22 12l-4.6 2.2 1.7 4.9-4.9-1.7L12 22l-2.2-4.6-4.9 1.7 1.7-4.9L2 12l4.6-2.2-1.7-4.9 4.9 1.7z" strokeWidth={2} />
+      <path d="M10 9.3h4.2l-2.5 5.6" strokeWidth={2.1} />
+    </svg>
+  );
+}
+
+// kalkan + onay: sigorta jokeri
+export function IconShield({ size = 22, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2.8l7.2 2.6v6c0 4.6-3 8-7.2 9.8C7.8 19.4 4.8 16 4.8 11.4v-6z" />
+      <path d="M8.9 11.6l2.2 2.3 4-4.4" strokeWidth={2.2} />
+    </svg>
+  );
+}
+
 // termometre: sayi avi jokeri
 export function IconThermometer({ size = 22, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
   return (
