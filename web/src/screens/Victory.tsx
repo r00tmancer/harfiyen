@@ -4,7 +4,6 @@ import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
 import { PLAYER_CSS } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
-import { fanfare, pop } from '../fx/sfx';
 import { paletteFor, rain } from '../fx/confetti';
 
 // kupa: sun dolgulu, ink konturlu buyuk SVG
@@ -62,7 +61,6 @@ export default function Victory() {
     if (!snapshot || !winner || matchEndSeq === 0 || matchEndSeq === celebratedSeq) return;
     celebratedSeq = matchEndSeq;
     rain(paletteFor(playerIndex(snapshot, winner.id)));
-    fanfare();
   }, [snapshot, winner, matchEndSeq]);
 
   if (!snapshot) return null;
@@ -129,7 +127,6 @@ export default function Victory() {
           className="btn-candy btn-mint btn-lg btn-block"
           disabled={mineWant}
           onClick={() => {
-            pop();
             send({ t: 'rematch' });
           }}
         >

@@ -6,7 +6,6 @@ import { Avatar } from '../ui/avatars';
 import { IconBack, IconCheck, IconCopy } from '../ui/icons';
 import { CodeTiles, PLAYER_CSS, WaitingDots } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
-import { pop } from '../fx/sfx';
 
 function PlayerCard({ p, idx, you }: { p: PlayerPublic; idx: 0 | 1; you?: boolean }) {
   const pal = PLAYER_CSS[idx];
@@ -55,7 +54,6 @@ export default function Lobby() {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
-      pop();
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       // pano izni yoksa en azindan adres cubugundaki hash zaten ayni linki tasir
@@ -125,7 +123,6 @@ export default function Lobby() {
           className="btn-candy btn-mint btn-lg btn-block"
           disabled={!me || me.ready || conn !== 'open'}
           onClick={() => {
-            pop();
             send({ t: 'ready' });
           }}
         >

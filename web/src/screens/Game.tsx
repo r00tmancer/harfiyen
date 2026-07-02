@@ -14,7 +14,6 @@ import { IconSwap } from '../ui/icons';
 import { PLAYER_CSS, Stars, TimerBar } from '../ui/parts';
 import { useRemaining, up } from '../hooks';
 import { acceptPunch, dropIn, popIn, punchIn, reducedMotion, staggerIn, wobble } from '../fx/anim';
-import { buzz, pop, tick } from '../fx/sfx';
 import { burst, paletteFor } from '../fx/confetti';
 
 // ---- ust skor bari ----
@@ -92,7 +91,6 @@ function Picking({ snap }: { snap: RoomSnapshot }) {
   function choose(letter: string) {
     if (locked) return;
     useStore.getState().pickLetterLocal(letter);
-    pop();
     send({ t: 'pick_letter', letter });
   }
 
@@ -153,7 +151,6 @@ function CountdownOverlay({ deadline }: { deadline: number | null }) {
   useEffect(() => {
     if (prev.current !== n) {
       prev.current = n;
-      tick();
       punchIn(ref.current);
     }
   }, [n]);
@@ -201,7 +198,6 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
   // BASLA! yazisi patlayip kaybolur
   useEffect(() => {
     if (!showStart) return;
-    pop();
     if (!reducedMotion()) punchIn(startRef.current);
     const id = window.setTimeout(() => setShowStart(false), 850);
     return () => window.clearTimeout(id);
@@ -211,7 +207,6 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
   useEffect(() => {
     if (!lastAccepted || lastAccepted.seq === accSeq.current) return;
     accSeq.current = lastAccepted.seq;
-    pop();
     burst(paletteFor(playerIndex(snap, lastAccepted.by)));
     if (lastAccepted.by === snap.you) {
       setWord('');
@@ -225,7 +220,6 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
   useEffect(() => {
     if (!lastRejected || lastRejected.seq === rejSeq.current) return;
     rejSeq.current = lastRejected.seq;
-    buzz();
     wobble(inputWrapRef.current);
     setErrFlash(true);
     const id = window.setTimeout(() => setErrFlash(false), 350);
