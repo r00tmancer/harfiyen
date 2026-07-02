@@ -362,7 +362,7 @@ function RoundEnd({ snap }: { snap: RoomSnapshot }) {
             <Avatar index={winner.avatar} color={PLAYER_CSS[wIdx].main} size={72} />
           </div>
           <h2 data-pop className="font-display text-2xl font-extrabold">
-            {winner.id === snap.you ? 'Raundu kaptın!' : `Raunt ${winner.nick}'in`}
+            {winner.id === snap.you ? 'Raundu kaptın!' : `Raundu ${winner.nick} kaptı`}
           </h2>
         </>
       ) : (
@@ -371,10 +371,13 @@ function RoundEnd({ snap }: { snap: RoomSnapshot }) {
         </h2>
       )}
 
-      {word && (
+      {word && winner && (
         <div data-pop className="card-candy w-full p-4!">
+          <p className="text-[13px] font-bold" style={{ color: 'var(--ink-soft)' }}>
+            {winner.id === snap.you ? 'yazdığın kelime' : `${winner.nick} bu kelimeyi yazdı`}
+          </p>
           <p
-            className="font-display text-3xl font-extrabold"
+            className="mt-1 font-display text-3xl font-extrabold"
             style={{ color: 'var(--ok)' }}
           >
             {up(word)}
