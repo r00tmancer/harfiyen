@@ -391,6 +391,74 @@ body {
 .dots span:nth-child(2) { animation-delay: 0.15s; background: var(--p1); }
 .dots span:nth-child(3) { animation-delay: 0.3s; background: var(--p2); }
 
+/* ---- buz jokeri ---- */
+.joker-btn {
+  position: relative;
+  width: 54px;
+  min-height: 54px;
+  padding: 0;
+  border-radius: 16px;
+  background: var(--p2-soft);
+}
+.joker-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  background: var(--p2);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* donmus giris alani katmani */
+.freeze-overlay {
+  position: absolute;
+  inset: -5px;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--p2-soft) 80%, transparent);
+  border: 3px solid var(--p2);
+  border-radius: 18px;
+}
+
+/* rakip donduruldu rozeti (skor panelinin kosesi) */
+.ice-badge {
+  position: absolute;
+  top: -9px;
+  right: -8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  background: var(--p2-soft);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  color: var(--p2-dark);
+}
+
+/* ---- kazanan renk yikamasi (raund sonu + zafer) ---- */
+.win-wash {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  animation: wash-in 300ms ease-out both;
+}
+@keyframes wash-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* konfeti tuvali her seyin ustunde ama tiklanamaz */
 .confetti-canvas {
   position: fixed;

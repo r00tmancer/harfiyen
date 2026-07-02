@@ -2,8 +2,11 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeTr, pairKey } from '@harfiyen/shared';
 import {
+  canUseJoker,
   chooseFallbackPair,
+  isFrozen,
   isNickClean,
+  jokerGrantedOnRound,
   loadDict,
   toPairCounts,
   toWordSet,
@@ -125,6 +128,55 @@ describe('loadDict', () => {
     expect(set.has('araba')).toBe(true);
     expect(set.size).toBe(3);
     expect(loadDict(raw)).toBe(set); // ayni girdi ayni Set (izolat cache)
+  });
+});
+
+describe('isFrozen — buz jokeri sinir durumlari', () => {
+  it('until aninin oncesinde donuktur', () => {
+    expect(isFrozen({ p1: 1000 }, 'p1', 999)).toBe(true);
+  });
+
+  it('tam sinirda (now === until) donuk DEGILDIR', () => {
+    expect(isFrozen({ p1: 1000 }, 'p1', 1000)).toBe(false);
+  });
+
+  it('until sonrasinda donuk degildir', () => {
+    expect(isFrozen({ p1: 1000 }, 'p1', 1001)).toBe(false);
+  });
+
+  it('kaydi olmayan oyuncu donuk degildir', () => {
+    expect(isFrozen({}, 'p1', 0)).toBe(false);
+    expect(isFrozen({ p2: 5000 }, 'p1', 100)).toBe(false);
+  });
+});
+
+describe('jokerGrantedOnRound — 5 raundluk blok matematigi', () => {
+  it('1. raundda ek joker dolmaz (baslangic hakki katilimda verilir)', () => {
+    expect(jokerGrantedOnRound(1)).toBe(false);
+  });
+
+  it('5. ve 10. raundda dolmaz', () => {
+    expect(jokerGrantedOnRound(5)).toBe(false);
+    expect(jokerGrantedOnRound(10)).toBe(false);
+  });
+
+  it('6. ve 11. raundda dolar', () => {
+    expect(jokerGrantedOnRound(6)).toBe(true);
+    expect(jokerGrantedOnRound(11)).toBe(true);
+  });
+});
+
+describe('canUseJoker', () => {
+  it('hak yoksa reddedilir', () => {
+    expect(canUseJoker(0, false)).toBe(false);
+  });
+
+  it('rakip zaten donuksa reddedilir', () => {
+    expect(canUseJoker(1, true)).toBe(false);
+  });
+
+  it('hak var ve rakip donuk degilse kullanilabilir', () => {
+    expect(canUseJoker(1, false)).toBe(true);
   });
 });
 

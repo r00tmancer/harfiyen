@@ -4,6 +4,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   AVATAR_COUNT,
   COUNTDOWN_MS,
+  JOKER_FREEZE_MS,
   MAX_NICK_LEN,
   MIN_PAIR_WORDS,
   PICK_MS,
@@ -16,7 +17,17 @@ import {
   pairKey,
 } from '@harfiyen/shared';
 import type { ClientMsg, Phase, RoomSnapshot, ServerMsg } from '@harfiyen/shared';
-import { chooseFallbackPair, isNickClean, loadDict, toPairCounts, toWordSet, validateWord } from './game/logic';
+import {
+  canUseJoker,
+  chooseFallbackPair,
+  isFrozen,
+  isNickClean,
+  jokerGrantedOnRound,
+  loadDict,
+  toPairCounts,
+  toWordSet,
+  validateWord,
+} from './game/logic';
 import type { Env } from './env';
 import wordsRaw from './data/words.txt';
 import pairsJson from './data/pairs.json';
@@ -48,6 +59,8 @@ interface RoomState {
   deadline: number | null;
   usedWords: string[];
   winner: string | null;
+  jokers: Record<string, number>; // pid -> kalan buz jokeri hakki
+  frozenUntil: Record<string, number>; // pid -> donmanin bittigi an (epoch ms)
   alarmPurpose: 'phase' | 'cleanup' | null;
 }
 
@@ -105,6 +118,8 @@ export class GameRoom extends DurableObject<Env> {
       deadline: null,
       usedWords: [],
       winner: null,
+      jokers: {},
+      frozenUntil: {},
       alarmPurpose: 'cleanup', // kimse katilmazsa oda kendini temizler
     };
     await this.ctx.storage.setAlarm(Date.now() + CLEANUP_MS);
@@ -151,6 +166,7 @@ export class GameRoom extends DurableObject<Env> {
         lastSubmitAt: 0,
       };
       state.players.push(player);
+      state.jokers[player.id] = 1; // her oyuncu maca 1 jokerle baslar
     } else {
       // ayni pid geri geldi: eski soket(ler) kapatilir, yenisi gecer
       for (const old of this.ctx.getWebSockets(pid)) {
@@ -211,6 +227,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'submit_word':
         await this.onSubmitWord(state, player, ws, msg.word);
         break;
+      case 'use_joker':
+        await this.onUseJoker(state, player);
+        break;
       case 'rematch':
         await this.onRematch(state, player);
         break;
@@ -251,6 +270,11 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
     const now = Date.now();
+    // donuk oyuncunun denemesi reddedilir; rakibe opp_rejected sinyali de gitmez
+    if (isFrozen(state.frozenUntil, player.id, now)) {
+      this.sendTo(ws, { t: 'word_rejected', word: attempt, reason: 'frozen' });
+      return;
+    }
     if (now - player.lastSubmitAt < SUBMIT_THROTTLE_MS) {
       this.sendTo(ws, { t: 'word_rejected', word: attempt, reason: 'throttled' });
       return;
@@ -268,6 +292,7 @@ export class GameRoom extends DurableObject<Env> {
     const word = verdict.word;
     state.usedWords.push(word);
     player.score += 1;
+    state.frozenUntil = {}; // yaris bitiyor, donmalar temizlenir
     const scores = this.scoresOf(state);
     this.broadcast({ t: 'word_accepted', by: player.id, word, scores });
     this.ctx.waitUntil(this.fetchMeaning(word));
@@ -281,7 +306,7 @@ export class GameRoom extends DurableObject<Env> {
       state.alarmPurpose = null;
       await this.ctx.storage.deleteAlarm();
       await this.save(state);
-      this.broadcast({ t: 'match_end', winner: player.id, scores });
+      this.broadcast({ t: 'match_end', winner: player.id, scores, word });
       this.broadcastSnapshot(state);
       return;
     }
@@ -295,6 +320,23 @@ export class GameRoom extends DurableObject<Env> {
     this.broadcastSnapshot(state);
   }
 
+  // Buz jokeri: yalnizca racing fazinda, hak varsa ve rakip zaten donuk degilse.
+  // Gecersiz kullanim sessizce yutulur (hata mesaji yok).
+  private async onUseJoker(state: RoomState, player: PlayerState): Promise<void> {
+    if (state.phase !== 'racing') return;
+    const opponent = state.players.find((p) => p.id !== player.id);
+    if (!opponent) return;
+    const now = Date.now();
+    if (!canUseJoker(state.jokers[player.id] ?? 0, isFrozen(state.frozenUntil, opponent.id, now))) return;
+
+    state.jokers[player.id] = (state.jokers[player.id] ?? 0) - 1;
+    const until = now + JOKER_FREEZE_MS;
+    state.frozenUntil[opponent.id] = until;
+    await this.save(state);
+    this.broadcast({ t: 'joker_used', by: player.id, until });
+    this.broadcastSnapshot(state);
+  }
+
   private async onRematch(state: RoomState, player: PlayerState): Promise<void> {
     if (state.phase !== 'match_end') return;
     player.rematch = true;
@@ -304,10 +346,12 @@ export class GameRoom extends DurableObject<Env> {
         p.score = 0;
         p.rematch = false;
         p.pickedLetter = null;
+        state.jokers[p.id] = 1; // rovansta joker haklari sifirlanip 1'e doner
       }
       state.usedWords = [];
       state.winner = null;
       state.round = 1;
+      state.frozenUntil = {};
       await this.startPicking(state);
       return;
     }
@@ -358,6 +402,7 @@ export class GameRoom extends DurableObject<Env> {
     state.letters = pending.letters;
     state.pending = null;
     state.phase = 'racing';
+    state.frozenUntil = {}; // yaris temiz baslar
     state.deadline = Date.now() + RACE_MS;
     state.alarmPurpose = 'phase';
     await this.ctx.storage.setAlarm(state.deadline);
@@ -397,6 +442,7 @@ export class GameRoom extends DurableObject<Env> {
       case 'racing': {
         // sure doldu, kazanan yok
         state.phase = 'round_end';
+        state.frozenUntil = {}; // yaristan cikarken bayat donmalar temizlenir
         state.deadline = Date.now() + RESULT_MS;
         state.alarmPurpose = 'phase';
         await this.ctx.storage.setAlarm(state.deadline);
@@ -407,6 +453,10 @@ export class GameRoom extends DurableObject<Env> {
       }
       case 'round_end':
         state.round += 1;
+        // 6, 11, 16... raundlarin basinda iki oyuncuya da +1 joker
+        if (jokerGrantedOnRound(state.round)) {
+          for (const p of state.players) state.jokers[p.id] = (state.jokers[p.id] ?? 0) + 1;
+        }
         await this.startPicking(state);
         break;
       default:
@@ -472,7 +522,13 @@ export class GameRoom extends DurableObject<Env> {
   // ---- Yardimcilar ----
 
   private async getState(): Promise<RoomState | null> {
-    return (await this.ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
+    const state = (await this.ctx.storage.get<RoomState>(STATE_KEY)) ?? null;
+    if (state) {
+      // joker alanlari sonradan eklendi; eski kayitlarda eksik olabilir
+      state.jokers ??= {};
+      state.frozenUntil ??= {};
+    }
+    return state;
   }
 
   private save(state: RoomState): Promise<void> {
@@ -520,6 +576,12 @@ export class GameRoom extends DurableObject<Env> {
 
   private snapshotFor(state: RoomState, you: string): RoomSnapshot {
     const lettersVisible = state.phase === 'racing' || state.phase === 'round_end';
+    // suresi gecmis donmalar snapshot'a sizmasin
+    const now = Date.now();
+    const frozenUntil: Record<string, number> = {};
+    for (const [pid, until] of Object.entries(state.frozenUntil)) {
+      if (now < until) frozenUntil[pid] = until;
+    }
     return {
       code: state.code,
       phase: state.phase,
@@ -533,11 +595,13 @@ export class GameRoom extends DurableObject<Env> {
         connected: p.connected,
         ready: p.ready,
         pickedLetter: p.pickedLetter !== null,
+        jokers: state.jokers[p.id] ?? 0,
       })),
       letters: lettersVisible ? state.letters : null,
       deadline: state.deadline,
       usedWords: state.usedWords,
       winner: state.winner,
+      frozenUntil,
     };
   }
 }

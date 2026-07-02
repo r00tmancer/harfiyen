@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import { meOf, oppOf, playerIndex, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
-import { PLAYER_CSS } from '../ui/parts';
+import { PLAYER_CSS, WinWash } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
 import { paletteFor, rain } from '../fx/confetti';
+import { up } from '../hooks';
 
 // kupa: sun dolgulu, ink konturlu buyuk SVG
 function Trophy({ size = 120 }: { size?: number }) {
@@ -45,6 +46,8 @@ export default function Victory() {
   const rematchWants = useStore((s) => s.rematchWants);
   const matchEndSeq = useStore((s) => s.matchEndSeq);
   const oppConnected = useStore((s) => s.oppConnected);
+  const finalWord = useStore((s) => s.finalWord);
+  const wordInfos = useStore((s) => s.wordInfos);
   const root = useRef<HTMLDivElement>(null);
 
   const winner = snapshot?.winner
@@ -74,6 +77,8 @@ export default function Victory() {
 
   return (
     <div ref={root} className="flex w-full flex-col items-center gap-5 pt-8 pb-6 text-center">
+      {/* kazanan renk yikamasi: ben -> mavi, rakip -> toz pembe */}
+      {snapshot.winner && <WinWash mine={iWon} />}
       <div data-pop>
         <Trophy />
       </div>
@@ -109,6 +114,21 @@ export default function Victory() {
           </div>
         )}
       </div>
+
+      {/* maci bitiren kelime + TDK anlami */}
+      {finalWord && winner && (
+        <div data-pop className="card-candy w-full p-4! text-center">
+          <p className="text-[13px] font-bold" style={{ color: 'var(--ink-soft)' }}>
+            {iWon ? 'maçı bitiren kelimen' : `${winner.nick} bu kelimeyle bitirdi`}
+          </p>
+          <p className="mt-1 font-display text-3xl font-extrabold" style={{ color: 'var(--ok)' }}>
+            {up(finalWord)}
+          </p>
+          <p className="mt-2 text-[14px] font-bold" style={{ color: 'var(--ink-soft)' }}>
+            {wordInfos[finalWord] ?? 'TDK anlamı geliyor...'}
+          </p>
+        </div>
+      )}
 
       {oppWants && !mineWant && (
         <div className="chip chip-sun" role="status">

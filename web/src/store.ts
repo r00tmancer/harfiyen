@@ -26,6 +26,7 @@ export const REJECT_TEXT: Record<WordRejectReason, string> = {
   too_short: 'En az 3 harf olmalı',
   too_late: 'Süre doldu',
   throttled: 'Biraz daha yavaş',
+  frozen: 'Donmuş durumdasın!',
 };
 
 const NICK_KEY = 'harfiyen:nick';
@@ -71,6 +72,8 @@ interface HarfiyenStore {
   lastRejected: { word: string; reason: WordRejectReason; seq: number } | null;
   oppRejectedSeq: number;
   roundResult: { winner: string | null; word: string | null } | null;
+  finalWord: string | null; // maci bitiren kelime (match_end'den)
+  jokerUse: { by: string; until: number; seq: number } | null; // tek seferlik animasyon icin
   wordInfos: Record<string, string>;
   rematchWants: string[];
   matchEndSeq: number;
@@ -102,6 +105,8 @@ const roomDefaults = {
   lastRejected: null,
   oppRejectedSeq: 0,
   roundResult: null,
+  finalWord: null as string | null,
+  jokerUse: null,
   wordInfos: {} as Record<string, string>,
   rematchWants: [] as string[],
   oppConnected: false,
@@ -167,6 +172,7 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               if (prevPhase === 'match_end' || prevPhase === null) {
                 patch.rematchWants = [];
                 patch.wordInfos = {};
+                patch.finalWord = null;
               }
             }
             if (s.phase === 'lobby') patch.rematchWants = [];
@@ -269,10 +275,29 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
         case 'word_info':
           return { wordInfos: { ...st.wordInfos, [msg.word]: msg.meaning } };
 
+        case 'joker_used': {
+          // by jokeri kullandi -> rakibi (diger oyuncu) donar
+          if (!st.snapshot) return {};
+          const frozenId = st.snapshot.players.find((p) => p.id !== msg.by)?.id;
+          return {
+            snapshot: {
+              ...st.snapshot,
+              frozenUntil: frozenId
+                ? { ...st.snapshot.frozenUntil, [frozenId]: msg.until }
+                : st.snapshot.frozenUntil,
+              players: st.snapshot.players.map((p) =>
+                p.id === msg.by ? { ...p, jokers: Math.max(0, p.jokers - 1) } : p,
+              ),
+            },
+            jokerUse: { by: msg.by, until: msg.until, seq: (st.jokerUse?.seq ?? 0) + 1 },
+          };
+        }
+
         case 'match_end': {
           const patch: Partial<HarfiyenStore> = {
             screen: 'victory',
             matchEndSeq: st.matchEndSeq + 1,
+            finalWord: msg.word,
           };
           if (st.snapshot) {
             patch.snapshot = {

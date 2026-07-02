@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
+  JOKER_FREEZE_MS,
   PICK_MS,
   RACE_MS,
   SUBMIT_THROTTLE_MS,
@@ -10,8 +11,8 @@ import type { RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, REJECT_TEXT, useStore } from '../store';
 import { send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
-import { IconSwap } from '../ui/icons';
-import { PLAYER_CSS, Stars, TimerBar } from '../ui/parts';
+import { IconSnowflake, IconSwap } from '../ui/icons';
+import { PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/parts';
 import { useRemaining, up } from '../hooks';
 import { acceptPunch, dropIn, popIn, punchIn, reducedMotion, staggerIn, wobble } from '../fx/anim';
 import { burst, paletteFor } from '../fx/confetti';
@@ -19,18 +20,30 @@ import { burst, paletteFor } from '../fx/confetti';
 // ---- ust skor bari ----
 function ScoreBar({ snap }: { snap: RoomSnapshot }) {
   const oppRejectedSeq = useStore((s) => s.oppRejectedSeq);
+  const jokerUse = useStore((s) => s.jokerUse);
   const me = meOf(snap);
   const opp = oppOf(snap);
   const myIdx = me ? playerIndex(snap, me.id) : 0;
   const oppIdx = myIdx === 0 ? 1 : 0;
   const oppRef = useRef<HTMLDivElement>(null);
   const prevRej = useRef(oppRejectedSeq);
+  const prevJokerSeq = useRef(jokerUse?.seq ?? 0);
 
   // rakip denedi-tutmadi: avatarinda minik sallanma
   useEffect(() => {
     if (oppRejectedSeq > prevRej.current) wobble(oppRef.current);
     prevRej.current = oppRejectedSeq;
   }, [oppRejectedSeq]);
+
+  // buz jokerini ben kullandim: rakip paneli tek seferlik sallanir
+  useEffect(() => {
+    if (!jokerUse || jokerUse.seq === prevJokerSeq.current) return;
+    prevJokerSeq.current = jokerUse.seq;
+    if (jokerUse.by === snap.you) wobble(oppRef.current);
+  }, [jokerUse, snap.you]);
+
+  const oppFrozenUntil = opp ? (snap.frozenUntil[opp.id] ?? 0) : 0;
+  const oppFrozenRem = useRemaining(oppFrozenUntil > Date.now() ? oppFrozenUntil : null);
 
   return (
     <div className="flex items-stretch justify-between gap-2">
@@ -52,9 +65,14 @@ function ScoreBar({ snap }: { snap: RoomSnapshot }) {
       {opp ? (
         <div
           ref={oppRef}
-          className="flex flex-1 items-center justify-end gap-2 rounded-2xl border-[3px] px-2.5 py-2"
+          className="relative flex flex-1 items-center justify-end gap-2 rounded-2xl border-[3px] px-2.5 py-2"
           style={{ borderColor: 'var(--ink)', background: PLAYER_CSS[oppIdx].soft, boxShadow: '0 4px 0 var(--shadow-ink)' }}
         >
+          {oppFrozenRem > 0 && (
+            <span className="ice-badge" role="img" aria-label="Rakip donmuş">
+              <IconSnowflake size={13} />
+            </span>
+          )}
           <div className="min-w-0 text-right">
             <p className="font-display truncate text-[13px] font-bold leading-tight">{opp.nick}</p>
             <div className="flex justify-end">
@@ -187,6 +205,26 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
 
   const [l1, l2] = snap.letters ?? ['?', '?'];
 
+  // ---- buz jokeri durumu ----
+  const me = meOf(snap);
+  const opp = oppOf(snap);
+  const jokers = me?.jokers ?? 0;
+
+  const myFrozenUntil = snap.frozenUntil[snap.you] ?? 0;
+  const myFrozenRem = useRemaining(myFrozenUntil > Date.now() ? myFrozenUntil : null);
+  const amFrozen = myFrozenRem > 0;
+
+  const oppFrozenUntil = opp ? (snap.frozenUntil[opp.id] ?? 0) : 0;
+  const oppFrozenRem = useRemaining(oppFrozenUntil > Date.now() ? oppFrozenUntil : null);
+  const oppFrozen = oppFrozenRem > 0;
+
+  // buz cozulunce input tekrar odaklanir
+  const wasFrozen = useRef(false);
+  useEffect(() => {
+    if (wasFrozen.current && !amFrozen) inputRef.current?.focus();
+    wasFrozen.current = amFrozen;
+  }, [amFrozen]);
+
   // taslar yukaridan dusup seker (reroll'da da tekrar)
   useEffect(() => {
     if (Date.now() - raceStartAt < 1200) {
@@ -230,7 +268,7 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
   function submit(e: FormEvent) {
     e.preventDefault();
     const w = word.trim();
-    if (!w || cooling) return;
+    if (!w || cooling || amFrozen) return;
     send({ t: 'submit_word', word: w });
     setCooling(true);
     window.setTimeout(() => setCooling(false), SUBMIT_THROTTLE_MS);
@@ -265,7 +303,20 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
         </div>
       )}
 
-      <form className="flex gap-2" onSubmit={submit}>
+      <form className="relative flex gap-2" onSubmit={submit}>
+        <button
+          type="button"
+          className="btn-candy joker-btn shrink-0"
+          disabled={jokers === 0 || oppFrozen || !opp || !opp.connected}
+          onClick={() => send({ t: 'use_joker' })}
+          title="Buz jokeri"
+          aria-label={`Buz jokeri: rakibi ${JOKER_FREEZE_MS / 1000} saniye dondur (${jokers} hak)`}
+        >
+          <IconSnowflake size={24} />
+          <span className="joker-count" aria-hidden="true">
+            {jokers}
+          </span>
+        </button>
         <div ref={inputWrapRef} className="min-w-0 flex-1">
           <input
             ref={inputRef}
@@ -279,16 +330,18 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
             spellCheck={false}
             enterKeyHint="send"
             lang="tr"
+            disabled={amFrozen}
             onChange={(e) => setWord(e.target.value)}
           />
         </div>
         <button
           type="submit"
           className="btn-candy btn-p1 shrink-0"
-          disabled={cooling || word.trim().length === 0}
+          disabled={cooling || word.trim().length === 0 || amFrozen}
         >
           Gönder
         </button>
+        {amFrozen && <FreezeOverlay rem={myFrozenRem} />}
       </form>
 
       <ul className="flex flex-col-reverse gap-2" aria-live="polite">
@@ -302,6 +355,22 @@ function Racing({ snap }: { snap: RoomSnapshot }) {
           />
         ))}
       </ul>
+    </div>
+  );
+}
+
+// buz jokeri yedin: giris alaninin ustunde geri sayimli buz katmani
+function FreezeOverlay({ rem }: { rem: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    wobble(ref.current);
+  }, []);
+  return (
+    <div ref={ref} className="freeze-overlay" role="status" aria-live="polite">
+      <span className="chip chip-p2">
+        <IconSnowflake size={16} />
+        Buz! {Math.max(1, Math.ceil(rem / 1000))} sn
+      </span>
     </div>
   );
 }
@@ -350,6 +419,8 @@ function RoundEnd({ snap }: { snap: RoomSnapshot }) {
 
   return (
     <div ref={root} className="flex flex-col items-center gap-4 pt-4 text-center">
+      {/* kazanan renk yikamasi; sure dolduysa (winner yok) yikama yok */}
+      {roundResult?.winner && <WinWash mine={roundResult.winner === snap.you} />}
       {winner ? (
         <>
           <div data-pop>

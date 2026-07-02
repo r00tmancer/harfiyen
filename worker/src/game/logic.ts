@@ -1,6 +1,22 @@
 // Saf oyun mantigi — veri dosyasi import etmez, sozluk/cift sayilari disaridan verilir.
-import { MIN_WORD_LEN, matchesPattern, normalizeTr } from '@harfiyen/shared';
+import { JOKER_PER_ROUNDS, MIN_WORD_LEN, matchesPattern, normalizeTr } from '@harfiyen/shared';
 import type { WordRejectReason } from '@harfiyen/shared';
+
+// Buz jokeri: oyuncu until anina KADAR donuktur; tam sinirda (now === until) donuk DEGILDIR.
+export function isFrozen(frozenUntil: Readonly<Record<string, number>>, pid: string, now: number): boolean {
+  const until = frozenUntil[pid] ?? 0;
+  return now < until;
+}
+
+// Yeni raund basladiginda iki oyuncuya da +1 joker dolar mi? (6, 11, 16, ...)
+export function jokerGrantedOnRound(round: number): boolean {
+  return round > 1 && round % JOKER_PER_ROUNDS === 1;
+}
+
+// Joker kullanma kosulu: hak var ve rakip su an zaten donuk degil.
+export function canUseJoker(jokers: number, opponentFrozenNow: boolean): boolean {
+  return jokers > 0 && !opponentFrozenNow;
+}
 
 export type WordVerdict =
   | { ok: true; word: string }

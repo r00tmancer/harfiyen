@@ -12,6 +12,8 @@ export const MIN_PAIR_WORDS = 3; // bir harf çiftinin kabul edilmesi için gere
 export const SUBMIT_THROTTLE_MS = 350;
 export const MAX_NICK_LEN = 12;
 export const AVATAR_COUNT = 8;
+export const JOKER_FREEZE_MS = 5_000; // buz jokeri: rakibin yazma alanı bu kadar donar
+export const JOKER_PER_ROUNDS = 5; // her 5 raundluk blok için 1 joker hakkı (1. ve 6. raundda dolar)
 
 export const TR_LETTERS = [
   'a', 'b', 'c', 'ç', 'd', 'e', 'f', 'g', 'ğ', 'h', 'ı', 'i', 'j', 'k', 'l',
@@ -60,6 +62,7 @@ export interface PlayerPublic {
   connected: boolean;
   ready: boolean;
   pickedLetter: boolean; // bu raund harfini kilitledi mi (harfin kendisi gizli kalır)
+  jokers: number; // kalan buz jokeri hakkı
 }
 
 export interface RoomSnapshot {
@@ -72,6 +75,7 @@ export interface RoomSnapshot {
   deadline: number | null; // aktif fazın bitişi, epoch ms (sunucu saati)
   usedWords: string[]; // bu maçta kabul edilmiş kelimeler (tekrar kullanılamaz)
   winner: string | null; // match_end'de kazanan oyuncu id'i
+  frozenUntil: Record<string, number>; // oyuncu id -> buz jokerinin bittiği an (epoch ms); donuk değilse yok
 }
 
 // ---- Mesajlar: istemci -> sunucu ----
@@ -79,6 +83,7 @@ export type ClientMsg =
   | { t: 'ready' }
   | { t: 'pick_letter'; letter: string }
   | { t: 'submit_word'; word: string }
+  | { t: 'use_joker' } // buz jokeri: yalnızca racing fazında, hak varsa
   | { t: 'rematch' };
 
 // ---- Mesajlar: sunucu -> istemci ----
@@ -88,7 +93,8 @@ export type WordRejectReason =
   | 'already_used'
   | 'too_short'
   | 'too_late'
-  | 'throttled';
+  | 'throttled'
+  | 'frozen'; // buz jokeri yüzünden donuk
 
 export type ServerMsg =
   | { t: 'snapshot'; state: RoomSnapshot } // katılım/yeniden bağlanma ve her faz değişiminde tam durum
@@ -100,7 +106,8 @@ export type ServerMsg =
   | { t: 'opp_rejected' } // rakip denedi-tutmadı sinyali (küçük vfx için)
   | { t: 'round_end'; winner: string | null; word: string | null; scores: Record<string, number> }
   | { t: 'word_info'; word: string; meaning: string } // TDK anlamı, asenkron gelebilir
-  | { t: 'match_end'; winner: string; scores: Record<string, number> }
+  | { t: 'joker_used'; by: string; until: number } // buz jokeri kullanıldı; until = donma bitişi (epoch ms)
+  | { t: 'match_end'; winner: string; scores: Record<string, number>; word: string | null } // word = maçı bitiren kelime
   | { t: 'rematch_state'; want: string[] } // rövanş isteyen oyuncu id'leri
   | { t: 'opp_conn'; connected: boolean }
   | { t: 'error'; code: 'room_full' | 'not_found' | 'bad_msg'; msg?: string };

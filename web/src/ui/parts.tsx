@@ -78,3 +78,16 @@ export function WaitingDots() {
     </span>
   );
 }
+
+// kazanan renk yikamasi: ben kazandim -> mavi, rakip -> toz pembe; icerigin arkasinda
+export function WinWash({ mine }: { mine: boolean }) {
+  return (
+    <div
+      className="win-wash"
+      style={{
+        background: `color-mix(in srgb, ${mine ? 'var(--p2-soft)' : 'var(--p1-soft)'} 70%, transparent)`,
+      }}
+      aria-hidden="true"
+    />
+  );
+}

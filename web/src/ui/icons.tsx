@@ -79,3 +79,13 @@ export function IconSwap({ size = 26, ...props }: { size?: number } & SVGProps<S
     </svg>
   );
 }
+
+// kar tanesi: buz jokeri
+export function IconSnowflake({ size = 22, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 2.8v18.4M4 7.4l16 9.2M20 7.4L4 16.6" />
+      <path d="M9.6 4.9L12 7.3l2.4-2.4M9.6 19.1L12 16.7l2.4 2.4" />
+    </svg>
+  );
+}
