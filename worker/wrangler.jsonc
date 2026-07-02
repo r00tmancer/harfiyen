@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "harfiyen",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "GameRoom" }]
+  },
+  // Free plan yalnızca SQLite-backed DO destekler: new_classes DEĞİL, new_sqlite_classes.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameRoom"] }],
+  // words.txt'yi metin modülü olarak import edebilmek için.
+  "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://reikurozora.github.io"
+  },
+  "observability": { "enabled": true }
+}
