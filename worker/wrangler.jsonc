@@ -11,7 +11,7 @@
   // words.txt'yi metin modülü olarak import edebilmek için.
   "rules": [{ "type": "Text", "globs": ["**/*.txt"], "fallthrough": true }],
   "vars": {
-    "ALLOWED_ORIGINS": "http://localhost:5173,https://reikurozora.github.io,https://harfiyen.r00tmancer.workers.dev"
+    "ALLOWED_ORIGINS": "http://localhost:5173,https://r00tmancer.github.io,https://harfiyen.r00tmancer.workers.dev"
   },
   "assets": { "directory": "../web/dist", "binding": "ASSETS" },
   "observability": { "enabled": true }
