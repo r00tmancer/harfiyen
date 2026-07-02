@@ -6,16 +6,29 @@ import {
   RACE_MS,
   SUBMIT_THROTTLE_MS,
   TR_LETTERS,
+  ZINCIR_LIVES,
 } from '@harfiyen/shared';
-import type { RoomSnapshot } from '@harfiyen/shared';
+import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, REJECT_TEXT, useStore } from '../store';
 import { send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
 import { IconSnowflake, IconSwap } from '../ui/icons';
-import { PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/parts';
+import { MODE_META } from '../ui/modes';
+import { Hearts, MedalDots, PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/parts';
 import { useRemaining, up } from '../hooks';
-import { acceptPunch, dropIn, popIn, punchIn, reducedMotion, staggerIn, wobble } from '../fx/anim';
+import { acceptPunch, dropIn, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
 import { burst, paletteFor } from '../fx/confetti';
+import { SayiPick, SayiRoundEnd, SayiTurn } from './modes/SayiGame';
+import { ZincirTurn } from './modes/ZincirGame';
+import { UzunRace, UzunReveal } from './modes/UzunGame';
+
+// skor gostergesi moda gore: harf/uzun yildiz, sayi madalya, zincir kalp
+function ScoreGauge({ snap, p }: { snap: RoomSnapshot; p: PlayerPublic }) {
+  if (snap.mode === 'sayi') return <MedalDots wins={snap.sayi?.roundWins[p.id] ?? 0} size={16} />;
+  if (snap.mode === 'zincir')
+    return <Hearts lives={snap.zincir?.lives[p.id] ?? ZINCIR_LIVES} size={16} />;
+  return <Stars score={p.score} size={17} />;
+}
 
 // ---- ust skor bari ----
 function ScoreBar({ snap }: { snap: RoomSnapshot }) {
@@ -55,7 +68,7 @@ function ScoreBar({ snap }: { snap: RoomSnapshot }) {
           <Avatar index={me.avatar} color={PLAYER_CSS[myIdx].main} size={38} />
           <div className="min-w-0">
             <p className="font-display truncate text-[13px] font-bold leading-tight">{me.nick}</p>
-            <Stars score={me.score} size={17} />
+            <ScoreGauge snap={snap} p={me} />
           </div>
         </div>
       )}
@@ -76,7 +89,7 @@ function ScoreBar({ snap }: { snap: RoomSnapshot }) {
           <div className="min-w-0 text-right">
             <p className="font-display truncate text-[13px] font-bold leading-tight">{opp.nick}</p>
             <div className="flex justify-end">
-              <Stars score={opp.score} size={17} />
+              <ScoreGauge snap={snap} p={opp} />
             </div>
           </div>
           <Avatar
@@ -141,7 +154,9 @@ function Picking({ snap }: { snap: RoomSnapshot }) {
         {opp?.pickedLetter && <OppPickedBadge />}
       </div>
       <p className="text-center text-[13px] font-bold" style={{ color: 'var(--ink-soft)' }}>
-        Kelime, seçilen iki harften biriyle başlayıp diğeriyle bitecek.
+        {snap.mode === 'uzun'
+          ? 'Tek hakkın olacak: iki harfe uyan EN UZUN kelimeyi bul.'
+          : 'Kelime, seçilen iki harften biriyle başlayıp diğeriyle bitecek.'}
       </p>
     </div>
   );
@@ -462,16 +477,58 @@ function RoundEnd({ snap }: { snap: RoomSnapshot }) {
 
 export default function Game() {
   const snapshot = useStore((s) => s.snapshot);
+  const zincirBoom = useStore((s) => s.zincirBoom);
+  const uzunReveal = useStore((s) => s.uzunReveal);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const prevBoomSeq = useRef(0);
+  // bomba patlamasi: kisa flas + yikama (patlayan bensem toz pembe, rakipse mavi)
+  const [boomFx, setBoomFx] = useState<{ mine: boolean; key: number } | null>(null);
+
+  useEffect(() => {
+    if (!zincirBoom || zincirBoom.seq === prevBoomSeq.current) return;
+    prevBoomSeq.current = zincirBoom.seq;
+    shake(rootRef.current);
+    const you = useStore.getState().snapshot?.you;
+    setBoomFx({ mine: zincirBoom.loser !== you, key: zincirBoom.seq });
+    const id = window.setTimeout(() => setBoomFx(null), 1200);
+    return () => window.clearTimeout(id);
+  }, [zincirBoom]);
+
   if (!snapshot) return null;
+  const mode = snapshot.mode;
 
   return (
-    <div className="flex w-full flex-col gap-4 pt-3 pb-6">
+    <div ref={rootRef} className="flex w-full flex-col gap-4 pt-3 pb-6">
+      {boomFx && (
+        <div key={boomFx.key} aria-hidden="true">
+          <div className="boom-flash" />
+          <WinWash mine={boomFx.mine} />
+        </div>
+      )}
       <ScoreBar snap={snapshot} />
-      <div className="chip chip-soft self-center">Raunt {snapshot.round}</div>
+      <div className="flex items-center gap-2 self-center">
+        <div className="chip chip-soft">
+          {mode === 'zincir' ? 'Halka' : 'Raunt'} {snapshot.round}
+        </div>
+        <div className="chip" style={{ background: 'color-mix(in srgb, var(--grape) 22%, #fff)' }}>
+          {MODE_META[mode].name}
+        </div>
+      </div>
       {snapshot.phase === 'picking' && <Picking snap={snapshot} />}
       {snapshot.phase === 'countdown' && <CountdownOverlay deadline={snapshot.deadline} />}
       {snapshot.phase === 'racing' && <Racing snap={snapshot} />}
-      {snapshot.phase === 'round_end' && <RoundEnd snap={snapshot} />}
+      {snapshot.phase === 'sayi_pick' && <SayiPick snap={snapshot} />}
+      {snapshot.phase === 'sayi_turn' && <SayiTurn snap={snapshot} />}
+      {snapshot.phase === 'zincir_turn' && <ZincirTurn snap={snapshot} />}
+      {snapshot.phase === 'uzun_race' && <UzunRace snap={snapshot} />}
+      {snapshot.phase === 'round_end' &&
+        (mode === 'sayi' ? (
+          <SayiRoundEnd snap={snapshot} />
+        ) : mode === 'uzun' && uzunReveal ? (
+          <UzunReveal snap={snapshot} />
+        ) : (
+          <RoundEnd snap={snapshot} />
+        ))}
     </div>
   );
 }

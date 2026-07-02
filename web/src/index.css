@@ -471,6 +471,188 @@ body {
 
 .grayed { filter: grayscale(1); opacity: 0.55; }
 
+/* ---- mod secim kartlari (lobi) ---- */
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  padding: 12px;
+  box-shadow: 0 5px 0 var(--shadow-ink);
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  font-family: var(--font-body);
+  transition: transform 100ms ease, box-shadow 100ms ease, background 150ms ease;
+}
+.mode-card:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--shadow-ink); }
+.mode-card:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 var(--shadow-ink); }
+.mode-card:disabled { cursor: default; }
+.mode-card:disabled:not(.sel) { opacity: 0.6; }
+.mode-card.sel {
+  background: var(--sun);
+  transform: rotate(-1deg) scale(1.02);
+}
+.mode-card:focus-visible { outline: 3px solid var(--grape); outline-offset: 2px; }
+.mode-icon { color: var(--ink); display: inline-flex; }
+.mode-name { font-family: var(--font-display); font-weight: 800; font-size: 15px; line-height: 1.15; }
+.mode-desc { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); line-height: 1.3; }
+.mode-card.sel .mode-desc { color: var(--ink); }
+.mode-joker { font-size: 10.5px; font-weight: 800; color: var(--grape); line-height: 1.25; }
+.mode-card.sel .mode-joker { color: var(--ink); }
+
+/* ---- sayi avi: daralan aralik seridi ---- */
+.range-track {
+  position: relative;
+  height: 26px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  overflow: hidden;
+}
+.range-known {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  opacity: 0.85;
+  transition:
+    left 450ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    width 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---- sayi secme surgusu ---- */
+.slider-candy {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  outline: none;
+}
+.slider-candy:disabled { opacity: 0.5; }
+.slider-candy::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--shadow-ink);
+  cursor: pointer;
+}
+.slider-candy::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--shadow-ink);
+  cursor: pointer;
+}
+.slider-candy:focus-visible { outline: 3px solid var(--grape); outline-offset: 2px; }
+
+/* ---- kelime zinciri: bomba + fitil ---- */
+.bomb-wrap { display: inline-flex; transform-origin: 50% 85%; }
+.bomb-wrap.ticking { animation: ticktock 0.45s ease-in-out infinite; }
+@keyframes ticktock {
+  0%, 100% { transform: rotate(-3.5deg); }
+  50% { transform: rotate(3.5deg); }
+}
+.fuse-track {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink-soft) 22%, transparent);
+}
+.fuse-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -55deg,
+    var(--sun) 0 7px,
+    color-mix(in srgb, var(--sun) 60%, var(--ink)) 7px 14px
+  );
+  border: 2px solid var(--ink);
+  transition: width 120ms linear;
+}
+.fuse-spark {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 120ms linear;
+  filter: drop-shadow(0 0 4px var(--sun));
+}
+
+/* zincir halkasindaki harf kutulari */
+.zincir-letter {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  height: 40px;
+  padding: 0 4px;
+  border: 2.5px solid var(--ink);
+  border-radius: 11px;
+  box-shadow: 0 3px 0 var(--shadow-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink);
+  user-select: none;
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+/* bomba patladi: tam ekran kirmizi flas */
+.boom-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--err) 45%, #fff);
+  animation: boom-fade 0.55s ease-out both;
+}
+@keyframes boom-fade {
+  from { opacity: 0.9; }
+  to { opacity: 0; }
+}
+
+/* ---- en uzun kelime: acilis kartlari ---- */
+.flip-wrap { perspective: 800px; }
+.reveal-card {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 250ms ease, opacity 250ms ease, filter 250ms ease;
+}
+.reveal-card.win { transform: scale(1.05); }
+.reveal-card.dim { opacity: 0.55; filter: grayscale(0.45); }
+.crown-badge {
+  position: absolute;
+  top: -15px;
+  right: -9px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--sun);
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  color: var(--ink);
+  transform: rotate(12deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

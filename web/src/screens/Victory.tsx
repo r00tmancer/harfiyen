@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { ZINCIR_LIVES } from '@harfiyen/shared';
+import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
-import { PLAYER_CSS, WinWash } from '../ui/parts';
+import { MODE_META } from '../ui/modes';
+import { Hearts, MedalDots, PLAYER_CSS, WinWash } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
 import { paletteFor, rain } from '../fx/confetti';
 import { up } from '../hooks';
@@ -35,6 +38,35 @@ function Trophy({ size = 120 }: { size?: number }) {
         strokeLinecap="round"
       />
     </svg>
+  );
+}
+
+// mac skoru moda gore: sayi raund kazanimi, digerleri puan
+function finalScoreOf(snap: RoomSnapshot, p: PlayerPublic): number {
+  if (snap.mode === 'sayi') return snap.sayi?.roundWins[p.id] ?? p.score;
+  return p.score;
+}
+
+// oyuncu sutunu: buyuk sayi + moda ozel gosterge (madalya/kalp)
+function PlayerScore({ snap, p, idx }: { snap: RoomSnapshot; p: PlayerPublic; idx: 0 | 1 }) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <Avatar
+        index={p.avatar}
+        color={PLAYER_CSS[idx].main}
+        size={56}
+        className={p.connected ? '' : 'grayed'}
+      />
+      <p className="font-display text-sm font-bold">{p.nick}</p>
+      {snap.mode === 'zincir' ? (
+        <Hearts lives={snap.zincir?.lives[p.id] ?? ZINCIR_LIVES} size={20} />
+      ) : (
+        <p className="font-display text-4xl font-extrabold" style={{ color: PLAYER_CSS[idx].dark }}>
+          {finalScoreOf(snap, p)}
+        </p>
+      )}
+      {snap.mode === 'sayi' && <MedalDots wins={snap.sayi?.roundWins[p.id] ?? 0} size={16} />}
+    </div>
   );
 }
 
@@ -86,33 +118,16 @@ export default function Victory() {
         {iWon ? 'Kazandın!' : winner ? `${winner.nick} kazandı` : 'Maç bitti'}
       </h1>
 
+      <div data-pop className="chip chip-soft">
+        {MODE_META[snapshot.mode].name}
+      </div>
+
       <div data-pop className="card-candy flex w-full items-center justify-around gap-3">
-        {me && (
-          <div className="flex flex-col items-center gap-1">
-            <Avatar index={me.avatar} color={PLAYER_CSS[myIdx].main} size={56} />
-            <p className="font-display text-sm font-bold">{me.nick}</p>
-            <p className="font-display text-4xl font-extrabold" style={{ color: PLAYER_CSS[myIdx].dark }}>
-              {me.score}
-            </p>
-          </div>
-        )}
+        {me && <PlayerScore snap={snapshot} p={me} idx={myIdx} />}
         <span className="font-display text-xl font-extrabold" style={{ color: 'var(--ink-soft)' }}>
           -
         </span>
-        {opp && (
-          <div className="flex flex-col items-center gap-1">
-            <Avatar
-              index={opp.avatar}
-              color={PLAYER_CSS[oppIdx].main}
-              size={56}
-              className={opp.connected ? '' : 'grayed'}
-            />
-            <p className="font-display text-sm font-bold">{opp.nick}</p>
-            <p className="font-display text-4xl font-extrabold" style={{ color: PLAYER_CSS[oppIdx].dark }}>
-              {opp.score}
-            </p>
-          </div>
-        )}
+        {opp && <PlayerScore snap={snapshot} p={opp} idx={oppIdx} />}
       </div>
 
       {/* maci bitiren kelime + TDK anlami */}

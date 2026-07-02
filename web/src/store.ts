@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { RACE_MS } from '@harfiyen/shared';
+import { RACE_MS, SAYI_TURN_MS, ZINCIR_START_MS } from '@harfiyen/shared';
 import type {
+  JokerKind,
   Phase,
   PlayerPublic,
   RoomSnapshot,
@@ -17,6 +18,22 @@ export interface Attempt {
   mine: boolean;
   ok: boolean;
   reason?: WordRejectReason;
+}
+
+export type GuessResult =
+  | 'yukari'
+  | 'asagi'
+  | 'buldu'
+  | 'kayniyor'
+  | 'sicak'
+  | 'ilik'
+  | 'soguk';
+
+export interface GuessEntry {
+  id: number;
+  by: string;
+  value: number;
+  result: GuessResult;
 }
 
 export const REJECT_TEXT: Record<WordRejectReason, string> = {
@@ -73,11 +90,30 @@ interface HarfiyenStore {
   oppRejectedSeq: number;
   roundResult: { winner: string | null; word: string | null } | null;
   finalWord: string | null; // maci bitiren kelime (match_end'den)
-  jokerUse: { by: string; until: number; seq: number } | null; // tek seferlik animasyon icin
+  jokerUse: { by: string; kind: JokerKind; until: number | null; seq: number } | null; // tek seferlik animasyon icin
   wordInfos: Record<string, string>;
   rematchWants: string[];
   matchEndSeq: number;
   oppConnected: boolean;
+
+  // ---- sayi avi ----
+  guessLog: GuessEntry[];
+  lastGuess: { by: string; value: number; result: GuessResult; seq: number } | null;
+  thermoArmedBy: string | null; // termometre jokeri kimde kurulu
+
+  // ---- kelime zinciri ----
+  lastZincir: { by: string; word: string; seq: number } | null;
+  zincirBoom: { loser: string; seq: number } | null;
+
+  // ---- en uzun kelime ----
+  myUzunTries: { word: string; rejected: boolean }[]; // bu raundda gonderdiklerim
+  uzunExtra: boolean; // cifte sans jokerini bu raund kullandim mi
+  uzunLocked: { by: string; seq: number } | null;
+  uzunReveal: {
+    words: Record<string, { word: string; len: number } | null>;
+    winner: string | null;
+    seq: number;
+  } | null;
 
   setNick(n: string): void;
   setAvatar(i: number): void;
@@ -88,6 +124,7 @@ interface HarfiyenStore {
   setConn(c: ConnState): void;
   enterRoom(code: string): void;
   pickLetterLocal(letter: string): void;
+  uzunTryLocal(word: string): void;
   leaveToHome(): void;
   remainingMs(): number;
   apply(msg: ServerMsg): void;
@@ -110,6 +147,15 @@ const roomDefaults = {
   wordInfos: {} as Record<string, string>,
   rematchWants: [] as string[],
   oppConnected: false,
+  guessLog: [] as GuessEntry[],
+  lastGuess: null,
+  thermoArmedBy: null as string | null,
+  lastZincir: null,
+  zincirBoom: null,
+  myUzunTries: [] as { word: string; rejected: boolean }[],
+  uzunExtra: false,
+  uzunLocked: null,
+  uzunReveal: null,
 };
 
 export const useStore = create<HarfiyenStore>()((set, get) => ({
@@ -142,6 +188,10 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
 
   pickLetterLocal: (letter) => set({ myLetter: letter }),
 
+  // (uzun) gonderim hakki yerelde dusulur; throttled reddinde geri iade edilir
+  uzunTryLocal: (word) =>
+    set((st) => ({ myUzunTries: [...st.myUzunTries, { word, rejected: false }] })),
+
   leaveToHome: () => set({ ...roomDefaults, screen: 'home', fromLink: false, joinCode: '' }),
 
   remainingMs: () => {
@@ -163,22 +213,40 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
             oppConnected: opp ? opp.connected : false,
           };
           if (prevPhase !== s.phase) {
+            // yeni mac (rovans/ilk mac) herhangi bir baslangic fazina gecince eski kalintilari sil
+            const freshMatch =
+              prevPhase === 'match_end' || prevPhase === null || prevPhase === 'lobby';
+            if (freshMatch && s.phase !== 'lobby' && s.phase !== 'match_end') {
+              patch.rematchWants = [];
+              patch.wordInfos = {};
+              patch.finalWord = null;
+              patch.lastZincir = null;
+              patch.zincirBoom = null;
+              patch.uzunReveal = null;
+            }
             if (s.phase === 'picking') {
               patch.myLetter = null;
               patch.attempts = [];
               patch.roundResult = null;
               patch.lettersRerolled = false;
-              // yeni mac (rovans) basladiysa eski istekler temizlenir
-              if (prevPhase === 'match_end' || prevPhase === null) {
-                patch.rematchWants = [];
-                patch.wordInfos = {};
-                patch.finalWord = null;
-              }
+              patch.myUzunTries = [];
+              patch.uzunExtra = false;
+              patch.uzunReveal = null;
+              patch.uzunLocked = null;
+            }
+            if (s.phase === 'sayi_pick') {
+              patch.guessLog = [];
+              patch.lastGuess = null;
+              patch.thermoArmedBy = null;
+              patch.roundResult = null;
             }
             if (s.phase === 'lobby') patch.rematchWants = [];
           }
           return patch;
         }
+
+        case 'mode_set':
+          return st.snapshot ? { snapshot: { ...st.snapshot, mode: msg.mode } } : {};
 
         case 'opp_picked': {
           if (!st.snapshot) return {};
@@ -207,10 +275,12 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
 
         case 'letters': {
           if (!st.snapshot) return {};
+          // (harf) yaris baslar; (uzun) uzun_race baslar — faz snapshot'la kesinlesir
+          const nextPhase: Phase = st.snapshot.mode === 'uzun' ? 'uzun_race' : 'racing';
           return {
             snapshot: {
               ...st.snapshot,
-              phase: 'racing',
+              phase: nextPhase,
               letters: msg.letters,
               deadline: Date.now() + RACE_MS, // snapshot gelince sunucu degeriyle duzelir
             },
@@ -239,8 +309,8 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
           };
         }
 
-        case 'word_rejected':
-          return {
+        case 'word_rejected': {
+          const patch: Partial<HarfiyenStore> = {
             attempts: [
               ...st.attempts,
               { id: ++attemptId, word: msg.word, mine: true, ok: false, reason: msg.reason },
@@ -251,6 +321,18 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               seq: (st.lastRejected?.seq ?? 0) + 1,
             },
           };
+          // (uzun) gecersiz kelime de hak yakar; throttled ise hak iade edilir
+          if (st.snapshot?.mode === 'uzun' && st.snapshot.phase === 'uzun_race') {
+            if (msg.reason === 'throttled') {
+              patch.myUzunTries = st.myUzunTries.slice(0, -1);
+            } else {
+              patch.myUzunTries = st.myUzunTries.map((t, i) =>
+                i === st.myUzunTries.length - 1 ? { ...t, rejected: true } : t,
+              );
+            }
+          }
+          return patch;
+        }
 
         case 'opp_rejected':
           return { oppRejectedSeq: st.oppRejectedSeq + 1 };
@@ -275,22 +357,158 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
         case 'word_info':
           return { wordInfos: { ...st.wordInfos, [msg.word]: msg.meaning } };
 
-        case 'joker_used': {
-          // by jokeri kullandi -> rakibi (diger oyuncu) donar
+        // ---- sayi avi ----
+        case 'guess_result': {
           if (!st.snapshot) return {};
-          const frozenId = st.snapshot.players.find((p) => p.id !== msg.by)?.id;
-          return {
-            snapshot: {
-              ...st.snapshot,
-              frozenUntil: frozenId
-                ? { ...st.snapshot.frozenUntil, [frozenId]: msg.until }
-                : st.snapshot.frozenUntil,
-              players: st.snapshot.players.map((p) =>
-                p.id === msg.by ? { ...p, jokers: Math.max(0, p.jokers - 1) } : p,
-              ),
+          const s = st.snapshot;
+          const other = s.players.find((p) => p.id !== msg.by)?.id ?? null;
+          const found = msg.result === 'buldu';
+          const patch: Partial<HarfiyenStore> = {
+            guessLog: [
+              ...st.guessLog,
+              { id: ++attemptId, by: msg.by, value: msg.value, result: msg.result },
+            ].slice(-12),
+            lastGuess: {
+              by: msg.by,
+              value: msg.value,
+              result: msg.result,
+              seq: (st.lastGuess?.seq ?? 0) + 1,
             },
-            jokerUse: { by: msg.by, until: msg.until, seq: (st.jokerUse?.seq ?? 0) + 1 },
+            snapshot: {
+              ...s,
+              sayi:
+                s.sayi && msg.bounds
+                  ? { ...s.sayi, bounds: { ...s.sayi.bounds, [msg.by]: msg.bounds } }
+                  : s.sayi,
+              // buldu degilse sira rakibe gecer; sunucu snapshot'i gelince kesinlesir
+              turn: found ? s.turn : other,
+              deadline: found ? s.deadline : Date.now() + SAYI_TURN_MS,
+            },
           };
+          if (st.thermoArmedBy === msg.by) patch.thermoArmedBy = null;
+          return patch;
+        }
+
+        // ---- kelime zinciri ----
+        case 'zincir_word': {
+          if (!st.snapshot) return {};
+          const s = st.snapshot;
+          const other = s.players.find((p) => p.id !== msg.by)?.id ?? s.turn;
+          return {
+            lastZincir: { by: msg.by, word: msg.word, seq: (st.lastZincir?.seq ?? 0) + 1 },
+            snapshot: {
+              ...s,
+              round: s.round + 1, // round = kabul edilen halka + 1
+              turn: other,
+              deadline: Date.now() + msg.turnMs,
+              usedWords: [...s.usedWords, msg.word],
+              zincir: s.zincir
+                ? { ...s.zincir, lastWord: msg.word, requiredLetter: msg.nextLetter, turnMs: msg.turnMs }
+                : s.zincir,
+            },
+          };
+        }
+
+        case 'zincir_boom': {
+          const patch: Partial<HarfiyenStore> = {
+            zincirBoom: { loser: msg.loser, seq: (st.zincirBoom?.seq ?? 0) + 1 },
+          };
+          if (st.snapshot) {
+            const s = st.snapshot;
+            const other = s.players.find((p) => p.id !== msg.loser)?.id ?? null;
+            patch.snapshot = {
+              ...s,
+              turn: other,
+              deadline: Date.now() + ZINCIR_START_MS,
+              zincir: s.zincir
+                ? {
+                    ...s.zincir,
+                    lives: msg.lives,
+                    requiredLetter: msg.nextLetter ?? s.zincir.requiredLetter,
+                    turnMs: ZINCIR_START_MS,
+                  }
+                : s.zincir,
+            };
+          }
+          return patch;
+        }
+
+        // ---- en uzun kelime ----
+        case 'uzun_locked': {
+          const patch: Partial<HarfiyenStore> = {
+            uzunLocked: { by: msg.by, seq: (st.uzunLocked?.seq ?? 0) + 1 },
+          };
+          if (st.snapshot?.uzun) {
+            patch.snapshot = {
+              ...st.snapshot,
+              uzun: {
+                ...st.snapshot.uzun,
+                submitted: { ...st.snapshot.uzun.submitted, [msg.by]: true },
+              },
+            };
+          }
+          return patch;
+        }
+
+        case 'uzun_reveal': {
+          const winWord = msg.winner ? (msg.words[msg.winner]?.word ?? null) : null;
+          const patch: Partial<HarfiyenStore> = {
+            uzunReveal: {
+              words: msg.words,
+              winner: msg.winner,
+              seq: (st.uzunReveal?.seq ?? 0) + 1,
+            },
+            roundResult: { winner: msg.winner, word: winWord },
+          };
+          if (st.snapshot) {
+            patch.snapshot = {
+              ...st.snapshot,
+              phase: 'round_end', // gosterim penceresi; snapshot gelince kesinlesir
+              players: st.snapshot.players.map((p) => ({
+                ...p,
+                score: msg.scores[p.id] ?? p.score,
+              })),
+            };
+          }
+          return patch;
+        }
+
+        case 'joker_used': {
+          if (!st.snapshot) return {};
+          const s = st.snapshot;
+          const otherId = s.players.find((p) => p.id !== msg.by)?.id ?? null;
+          const patch: Partial<HarfiyenStore> = {
+            jokerUse: {
+              by: msg.by,
+              kind: msg.kind,
+              until: msg.until ?? null,
+              seq: (st.jokerUse?.seq ?? 0) + 1,
+            },
+          };
+          let snap: RoomSnapshot = {
+            ...s,
+            players: s.players.map((p) =>
+              p.id === msg.by ? { ...p, jokers: Math.max(0, p.jokers - 1) } : p,
+            ),
+          };
+          // buz: rakip donar
+          if (msg.kind === 'buz' && msg.until !== undefined && otherId) {
+            snap = { ...snap, frozenUntil: { ...snap.frozenUntil, [otherId]: msg.until } };
+          }
+          // termometre: sonraki tahmin banda cevrilir
+          if (msg.kind === 'termometre') patch.thermoArmedBy = msg.by;
+          // pas: ayni harfle sira rakibe, mevcut turnMs ile taze sure
+          if (msg.kind === 'pas') {
+            snap = {
+              ...snap,
+              turn: otherId ?? snap.turn,
+              deadline: Date.now() + (snap.zincir?.turnMs ?? ZINCIR_START_MS),
+            };
+          }
+          // cifte sans: bu raund icin +1 gonderim hakki
+          if (msg.kind === 'cifte_sans' && msg.by === s.you) patch.uzunExtra = true;
+          patch.snapshot = snap;
+          return patch;
         }
 
         case 'match_end': {

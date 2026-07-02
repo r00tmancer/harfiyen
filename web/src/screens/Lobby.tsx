@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlayerPublic } from '@harfiyen/shared';
+import type { GameMode, PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
 import { IconBack, IconCheck, IconCopy } from '../ui/icons';
+import { MODE_META, MODE_ORDER } from '../ui/modes';
 import { CodeTiles, PLAYER_CSS, WaitingDots } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
 
@@ -28,6 +29,53 @@ function PlayerCard({ p, idx, you }: { p: PlayerPublic; idx: 0 | 1; you?: boolea
       ) : (
         <span className="chip chip-soft">Bekliyor</span>
       )}
+    </div>
+  );
+}
+
+// 2x2 mod secim kartlari; sadece odayi kuran (ilk oyuncu) secebilir
+function ModePicker({ snap }: { snap: RoomSnapshot }) {
+  const creator = snap.players[0];
+  const isCreator = creator?.id === snap.you;
+
+  function pick(mode: GameMode) {
+    if (!isCreator || mode === snap.mode) return;
+    send({ t: 'set_mode', mode });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-extrabold">Oyun modu</h2>
+        {!isCreator && creator && (
+          <span className="text-[12px] font-bold" style={{ color: 'var(--ink-soft)' }}>
+            Modu {creator.nick} seçer
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {MODE_ORDER.map((m) => {
+          const meta = MODE_META[m];
+          const sel = snap.mode === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              className={`mode-card ${sel ? 'sel' : ''}`}
+              disabled={!isCreator}
+              aria-pressed={sel}
+              onClick={() => pick(m)}
+            >
+              <span className="mode-icon" aria-hidden="true">
+                <meta.Icon size={26} />
+              </span>
+              <span className="mode-name">{meta.name}</span>
+              <span className="mode-desc">{meta.desc}</span>
+              <span className="mode-joker">{meta.joker}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -116,6 +164,12 @@ export default function Lobby() {
           </div>
         )}
       </div>
+
+      {snapshot && (
+        <div data-pop>
+          <ModePicker snap={snapshot} />
+        </div>
+      )}
 
       <div data-pop>
         <button

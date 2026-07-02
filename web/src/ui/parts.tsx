@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { TARGET_SCORE } from '@harfiyen/shared';
-import { jelly } from '../fx/anim';
+import { SAYI_ROUNDS_TO_WIN, TARGET_SCORE, ZINCIR_LIVES } from '@harfiyen/shared';
+import { jelly, wobble } from '../fx/anim';
 import { useRemaining, up } from '../hooks';
 
 // oyuncu rengi: katilim sirasina gore css degiskenleri
@@ -40,6 +40,74 @@ export function Stars({ score, size = 20 }: { score: number; size?: number }) {
       {Array.from({ length: TARGET_SCORE }, (_, i) => (
         <span key={i} className="inline-flex">
           <Star filled={i < score} size={size} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// kalp: zincir modunda can gostergesi
+function Heart({ filled, size = 18 }: { filled: boolean; size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path
+        d="M12 20.4S4.6 15.9 2.5 11.2C1 7.9 3 4.6 6.4 4.6c2.2 0 3.9 1.3 5.6 3.3 1.7-2 3.4-3.3 5.6-3.3 3.4 0 5.4 3.3 3.9 6.6-2.1 4.7-9.5 9.2-9.5 9.2z"
+        fill={filled ? 'var(--p1)' : 'var(--card)'}
+        stroke={filled ? 'var(--ink)' : 'var(--ink-soft)'}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+        opacity={filled ? 1 : 0.4}
+      />
+    </svg>
+  );
+}
+
+// 3 can yuvasi; can gidince kalan dizi sallanir
+export function Hearts({ lives, size = 18 }: { lives: number; size?: number }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const prev = useRef(lives);
+  useEffect(() => {
+    if (lives < prev.current) wobble(wrap.current);
+    prev.current = lives;
+  }, [lives]);
+  return (
+    <div ref={wrap} className="flex gap-0.5" aria-label={`${lives} can`}>
+      {Array.from({ length: ZINCIR_LIVES }, (_, i) => (
+        <span key={i} className="inline-flex">
+          <Heart filled={i < lives} size={size} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// sayi avi: 3 madalya noktasi (kazanilan raundlar)
+export function MedalDots({ wins, size = 16 }: { wins: number; size?: number }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const prev = useRef(wins);
+  useEffect(() => {
+    if (wins > prev.current && wrap.current) {
+      const el = wrap.current.children[wins - 1];
+      if (el) jelly(el);
+    }
+    prev.current = wins;
+  }, [wins]);
+  return (
+    <div ref={wrap} className="flex items-center gap-1" aria-label={`${wins} raund`}>
+      {Array.from({ length: SAYI_ROUNDS_TO_WIN }, (_, i) => (
+        <span key={i} className="inline-flex">
+          <svg viewBox="0 0 20 20" width={size} height={size} aria-hidden="true">
+            <circle
+              cx={10}
+              cy={10}
+              r={7.4}
+              fill={i < wins ? 'var(--sun)' : 'var(--card)'}
+              stroke={i < wins ? 'var(--ink)' : 'var(--ink-soft)'}
+              strokeWidth={2}
+              opacity={i < wins ? 1 : 0.45}
+            />
+            {i < wins && <circle cx={10} cy={10} r={2.6} fill="var(--ink)" opacity={0.35} />}
+          </svg>
         </span>
       ))}
     </div>

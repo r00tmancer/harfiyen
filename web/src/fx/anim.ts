@@ -95,3 +95,40 @@ export function acceptPunch(el: Element | null): void {
     { scale: 1, duration: 0.4, ease: 'back.out(3)', clearProps: 'transform' },
   );
 }
+
+// bomba patlamasi: tum ekran sarsintisi
+export function shake(el: Element | null): void {
+  if (!el || reducedMotion()) return;
+  gsap.to(el, {
+    keyframes: [
+      { x: -14, y: 6, duration: 0.05 },
+      { x: 12, y: -6, duration: 0.05 },
+      { x: -9, y: 4, duration: 0.05 },
+      { x: 7, y: -3, duration: 0.05 },
+      { x: -4, y: 2, duration: 0.05 },
+      { x: 0, y: 0, duration: 0.07 },
+    ],
+    ease: 'power1.inOut',
+    clearProps: 'x,y',
+  });
+}
+
+// uzun kelime karti: rotateY ile acilis (flip)
+export function flipIn(el: Element | null, delay = 0): void {
+  if (!el || reducedMotion()) return;
+  gsap.fromTo(
+    el,
+    { rotationY: 90, opacity: 0 },
+    { rotationY: 0, opacity: 1, duration: 0.55, delay, ease: 'back.out(1.6)', clearProps: 'transform,opacity' },
+  );
+}
+
+// yukari/asagi ok ziplamasi: dy yonunde itip yerine oturt
+export function nudgeY(el: Element | null, dy: number): void {
+  if (!el || reducedMotion()) return;
+  gsap.fromTo(
+    el,
+    { y: dy },
+    { y: 0, duration: 0.55, ease: 'bounce.out', clearProps: 'y' },
+  );
+}

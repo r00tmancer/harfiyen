@@ -15,6 +15,40 @@ export const AVATAR_COUNT = 8;
 export const JOKER_FREEZE_MS = 5_000; // buz jokeri: rakibin yazma alanı bu kadar donar
 export const JOKER_PER_ROUNDS = 5; // her 5 raundluk blok için 1 joker hakkı (1. ve 6. raundda dolar)
 
+// ---- Oyun modları ----
+export type GameMode = 'harf' | 'sayi' | 'zincir' | 'uzun';
+export const DEFAULT_MODE: GameMode = 'harf';
+
+// Sayı Avı
+export const SAYI_MIN = 1;
+export const SAYI_MAX = 100;
+export const SAYI_ROUNDS_TO_WIN = 3; // 3 raund kazanan maçı alır
+export const SAYI_PICK_MS = 15_000; // gizli sayı seçme süresi
+export const SAYI_TURN_MS = 20_000; // tahmin sırası süresi (dolarsa sıra yanar)
+// Termometre jokeri mesafe bantları (|tahmin - gizli|)
+export const SAYI_BAND_KAYNIYOR = 3;
+export const SAYI_BAND_SICAK = 10;
+export const SAYI_BAND_ILIK = 25;
+
+// Kelime Zinciri
+export const ZINCIR_LIVES = 3;
+export const ZINCIR_START_MS = 15_000; // ilk tur süresi
+export const ZINCIR_MIN_MS = 6_000; // sürenin inebileceği taban
+export const ZINCIR_DECAY_MS = 500; // her başarılı kelimede süre bu kadar kısalır
+
+// En Uzun Kelime
+export const UZUN_ROUND_MS = 30_000; // tek gönderimlik yarış süresi
+export const UZUN_TARGET = 5; // maçı kazanmak için puan
+
+// Mod başına joker türü (UI metni istemcide)
+export type JokerKind = 'buz' | 'termometre' | 'pas' | 'cifte_sans';
+export const MODE_JOKER: Record<GameMode, JokerKind> = {
+  harf: 'buz',
+  sayi: 'termometre',
+  zincir: 'pas',
+  uzun: 'cifte_sans',
+};
+
 export const TR_LETTERS = [
   'a', 'b', 'c', 'ç', 'd', 'e', 'f', 'g', 'ğ', 'h', 'ı', 'i', 'j', 'k', 'l',
   'm', 'n', 'o', 'ö', 'p', 'r', 's', 'ş', 't', 'u', 'ü', 'v', 'y', 'z',
@@ -48,11 +82,36 @@ export function matchesPattern(word: string, l1: string, l2: string): boolean {
 // ---- Durum modelleri ----
 export type Phase =
   | 'lobby' // rakip bekleniyor / hazır olma
-  | 'picking' // iki oyuncu gizlice harf seçiyor
+  | 'picking' // (harf/uzun) iki oyuncu gizlice harf seçiyor
   | 'countdown' // 3-2-1
-  | 'racing' // kelime yarışı
+  | 'racing' // (harf) kelime yarışı
+  | 'sayi_pick' // (sayi) iki oyuncu gizli sayısını seçiyor
+  | 'sayi_turn' // (sayi) sıradaki oyuncu tahmin ediyor
+  | 'zincir_turn' // (zincir) sıradaki oyuncu kelime yazıyor, bomba tıkırdıyor
+  | 'uzun_race' // (uzun) tek gönderimlik uzun kelime yarışı
   | 'round_end' // raund sonucu gösteriliyor
   | 'match_end'; // maç bitti
+
+// Sayı Avı: her oyuncunun RAKİBİN sayısı için bildiği aralık (tahminciye göre)
+export interface SayiState {
+  roundWins: Record<string, number>; // oyuncu id -> kazanılan raund
+  bounds: Record<string, { lo: number; hi: number }>; // tahmin EDEN oyuncu id -> bildiği aralık (lo < x < hi)
+  myNumber: number | null; // SADECE alıcının kendi gizli sayısı (snapshot kişiye özel)
+  myPicked: boolean;
+  oppPicked: boolean;
+  equalizer: boolean; // ikinci oyuncunun eşitleme tahmini aşaması mı
+}
+
+export interface ZincirState {
+  lives: Record<string, number>;
+  lastWord: string | null;
+  requiredLetter: string | null; // sıradaki kelimenin başlaması gereken harf
+  turnMs: number; // bu turun toplam süresi (gitgide kısalır)
+}
+
+export interface UzunState {
+  submitted: Record<string, boolean>; // kim kelimesini kilitledi (kelime gizli)
+}
 
 export interface PlayerPublic {
   id: string;
@@ -67,23 +126,31 @@ export interface PlayerPublic {
 
 export interface RoomSnapshot {
   code: string;
+  mode: GameMode;
   phase: Phase;
   round: number; // 1'den başlar
   you: string; // senin oyuncu id'in
   players: PlayerPublic[];
-  letters: [string, string] | null; // sadece racing/round_end fazlarında dolu
+  letters: [string, string] | null; // (harf/uzun) sadece yarış/round_end fazlarında dolu
   deadline: number | null; // aktif fazın bitişi, epoch ms (sunucu saati)
   usedWords: string[]; // bu maçta kabul edilmiş kelimeler (tekrar kullanılamaz)
   winner: string | null; // match_end'de kazanan oyuncu id'i
-  frozenUntil: Record<string, number>; // oyuncu id -> buz jokerinin bittiği an (epoch ms); donuk değilse yok
+  frozenUntil: Record<string, number>; // (harf) oyuncu id -> buz jokerinin bittiği an
+  turn: string | null; // (sayi/zincir) sıra hangi oyuncuda
+  sayi: SayiState | null;
+  zincir: ZincirState | null;
+  uzun: UzunState | null;
 }
 
 // ---- Mesajlar: istemci -> sunucu ----
 export type ClientMsg =
   | { t: 'ready' }
+  | { t: 'set_mode'; mode: GameMode } // sadece lobby'de, sadece odayı kuran (ilk oyuncu)
   | { t: 'pick_letter'; letter: string }
-  | { t: 'submit_word'; word: string }
-  | { t: 'use_joker' } // buz jokeri: yalnızca racing fazında, hak varsa
+  | { t: 'submit_word'; word: string } // harf/zincir/uzun modlarında kelime gönderimi
+  | { t: 'pick_number'; value: number } // (sayi) gizli sayı seçimi
+  | { t: 'guess'; value: number } // (sayi) sıradaki tahmin
+  | { t: 'use_joker' } // moda özel joker (MODE_JOKER)
   | { t: 'rematch' };
 
 // ---- Mesajlar: sunucu -> istemci ----
@@ -106,8 +173,28 @@ export type ServerMsg =
   | { t: 'opp_rejected' } // rakip denedi-tutmadı sinyali (küçük vfx için)
   | { t: 'round_end'; winner: string | null; word: string | null; scores: Record<string, number> }
   | { t: 'word_info'; word: string; meaning: string } // TDK anlamı, asenkron gelebilir
-  | { t: 'joker_used'; by: string; until: number } // buz jokeri kullanıldı; until = donma bitişi (epoch ms)
-  | { t: 'match_end'; winner: string; scores: Record<string, number>; word: string | null } // word = maçı bitiren kelime
+  | { t: 'joker_used'; by: string; kind: JokerKind; until?: number } // until sadece buz için
+  | { t: 'mode_set'; mode: GameMode } // lobby'de mod değişti
+  // Sayı Avı
+  | {
+      t: 'guess_result';
+      by: string; // tahmini yapan
+      value: number;
+      result: 'yukari' | 'asagi' | 'buldu' | 'kayniyor' | 'sicak' | 'ilik' | 'soguk'; // son dördü termometre jokeri
+      bounds: { lo: number; hi: number } | null; // tahmincinin güncel aralığı (termometrede değişmez -> null olabilir)
+    }
+  // Kelime Zinciri
+  | { t: 'zincir_word'; by: string; word: string; nextLetter: string; turnMs: number } // kabul edilen halka
+  | { t: 'zincir_boom'; loser: string; lives: Record<string, number>; nextLetter: string | null } // süre doldu, can gitti
+  // En Uzun Kelime
+  | { t: 'uzun_locked'; by: string } // oyuncu kelimesini kilitledi (kelime gizli)
+  | {
+      t: 'uzun_reveal';
+      words: Record<string, { word: string; len: number } | null>; // oyuncu id -> gönderdiği (null = göndermedi/geçersiz)
+      winner: string | null;
+      scores: Record<string, number>;
+    }
+  | { t: 'match_end'; winner: string; scores: Record<string, number>; word: string | null } // word = maçı bitiren kelime (kelime modları)
   | { t: 'rematch_state'; want: string[] } // rövanş isteyen oyuncu id'leri
   | { t: 'opp_conn'; connected: boolean }
   | { t: 'error'; code: 'room_full' | 'not_found' | 'bad_msg'; msg?: string };
