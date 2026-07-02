@@ -1,0 +1,412 @@
+@import "tailwindcss";
+
+/* Harfiyen "Sekerleme" tasarim sistemi — bkz. docs/DESIGN.md */
+:root {
+  --bg: #FFF6EC;
+  --bg-2: #FFEEDD;
+  --card: #FFFFFF;
+  --ink: #3F3D56;
+  --ink-soft: #6E6A8F;
+  --p1: #FF6FA9;
+  --p1-dark: #E44B8D;
+  --p1-soft: #FFE1EE;
+  --p2: #4FB8FF;
+  --p2-dark: #2E9BE8;
+  --p2-soft: #E0F2FF;
+  --sun: #FFC93C;
+  --mint: #3EDBB2;
+  --grape: #A78BFA;
+  --ok: #38D9A9;
+  --err: #FF6B6B;
+
+  --shadow-ink: color-mix(in srgb, var(--ink) 18%, transparent);
+  --font-display: "Baloo 2", "Trebuchet MS", sans-serif;
+  --font-body: "Nunito", "Segoe UI", sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--bg-2) 3px, transparent 3.6px);
+  background-size: 42px 42px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* ---- butonlar ---- */
+.btn-candy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--ink);
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  min-height: 52px;
+  padding: 12px 22px;
+  box-shadow: 0 6px 0 var(--shadow-ink);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 90ms ease, box-shadow 90ms ease, filter 150ms ease;
+}
+.btn-candy:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 7px 0 var(--shadow-ink);
+}
+.btn-candy:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 var(--shadow-ink);
+  filter: brightness(0.98);
+}
+.btn-candy:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-candy:focus-visible {
+  outline: 3px solid var(--grape);
+  outline-offset: 2px;
+}
+.btn-p1 { background: var(--p1); color: #fff; }
+.btn-p2 { background: var(--p2); color: #fff; }
+.btn-sun { background: var(--sun); }
+.btn-mint { background: var(--mint); color: #fff; }
+.btn-grape { background: var(--grape); color: #fff; }
+.btn-block { width: 100%; }
+.btn-lg { min-height: 60px; font-size: 21px; border-radius: 20px; }
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border-radius: 16px;
+}
+
+/* ---- kartlar ---- */
+.card-candy {
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 24px;
+  box-shadow: 0 6px 0 var(--shadow-ink);
+  padding: 20px;
+}
+.card-dashed {
+  border: 3px dashed color-mix(in srgb, var(--ink-soft) 60%, transparent);
+  border-radius: 24px;
+  padding: 20px;
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+}
+
+/* ---- harf taslari ---- */
+.tile {
+  display: inline-grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  box-shadow: 0 6px 0 var(--shadow-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--ink);
+  user-select: none;
+}
+.tile-sm {
+  width: 48px;
+  height: 48px;
+  font-size: 26px;
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--shadow-ink);
+}
+.tile-rot-l { transform: rotate(-3deg); }
+.tile-rot-r { transform: rotate(2deg); }
+.tile-p1 { background: var(--p1-soft); }
+.tile-p2 { background: var(--p2-soft); }
+.tile-sun { background: var(--sun); }
+
+/* logo taslari */
+.logo-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 46px;
+  border: 3px solid var(--ink);
+  border-radius: 13px;
+  box-shadow: 0 5px 0 var(--shadow-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  color: #fff;
+  user-select: none;
+}
+
+/* ---- girisler ---- */
+.input-candy {
+  width: 100%;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  min-height: 54px;
+  padding: 12px 16px;
+  outline: none;
+  box-shadow: 0 5px 0 var(--shadow-ink);
+  transition: border-color 120ms ease;
+}
+.input-candy::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.55;
+  font-weight: 600;
+}
+.input-candy:focus {
+  border-color: var(--grape);
+}
+.input-candy.input-err {
+  border-color: var(--err);
+}
+.input-code {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* ---- rozetler ---- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.chip-ok { background: color-mix(in srgb, var(--ok) 22%, #fff); }
+.chip-err { background: color-mix(in srgb, var(--err) 20%, #fff); }
+.chip-sun { background: var(--sun); }
+.chip-p1 { background: var(--p1-soft); }
+.chip-p2 { background: var(--p2-soft); }
+.chip-soft { border-color: var(--ink-soft); color: var(--ink-soft); background: transparent; }
+
+/* ---- harf secme klavyesi ---- */
+.letter-key {
+  display: inline-grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--shadow-ink);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease;
+}
+.letter-key:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 0 var(--shadow-ink); }
+.letter-key:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow-ink); }
+.letter-key:disabled { opacity: 0.4; cursor: default; }
+.letter-key.sel {
+  background: var(--sun);
+  transform: scale(1.08) rotate(-3deg);
+  opacity: 1;
+}
+
+/* ---- sure seridi ---- */
+.timer-track {
+  width: 100%;
+  height: 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  overflow: hidden;
+}
+.timer-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mint);
+  transition: width 120ms linear, background 300ms ease;
+}
+.timer-fill.low { background: var(--err); }
+
+/* ---- deneme akisi ---- */
+.feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 2.5px solid var(--ink);
+  border-radius: 14px;
+  padding: 8px 14px;
+  background: var(--card);
+  font-weight: 700;
+}
+.feed-item.ok { background: color-mix(in srgb, var(--ok) 16%, #fff); }
+.feed-item.err { background: color-mix(in srgb, var(--err) 13%, #fff); }
+
+/* ---- tam ekran katman (geri sayim) ---- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 92%, var(--ink));
+}
+.count-num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(110px, 42vw, 190px);
+  line-height: 1;
+  text-shadow: 0 10px 0 var(--shadow-ink);
+}
+.start-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(56px, 18vw, 96px);
+  color: var(--mint);
+  text-shadow: 0 6px 0 var(--shadow-ink);
+}
+
+/* ---- toast ---- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 0 6px 0 var(--shadow-ink);
+  padding: 10px 18px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+/* ---- ses dugmesi ---- */
+.sound-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 5px 0 var(--shadow-ink);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 90ms ease, box-shadow 90ms ease;
+}
+.sound-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--shadow-ink); }
+
+/* ---- avatar secici ---- */
+.avatar-pick {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  min-height: 64px;
+  background: var(--bg-2);
+  border: 3px solid transparent;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform 100ms ease, border-color 120ms ease, background 120ms ease, box-shadow 100ms ease;
+}
+.avatar-pick:hover { transform: translateY(-2px); }
+.avatar-pick.sel {
+  background: var(--card);
+  border-color: var(--ink);
+  box-shadow: 0 4px 0 var(--shadow-ink);
+  transform: scale(1.06);
+}
+
+/* ---- bekleme noktalari ---- */
+@keyframes dot-bounce {
+  0%, 70%, 100% { transform: translateY(0); }
+  35% { transform: translateY(-9px); }
+}
+.dots {
+  display: inline-flex;
+  gap: 7px;
+}
+.dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--ink-soft);
+  animation: dot-bounce 1.15s ease-in-out infinite;
+}
+.dots span:nth-child(2) { animation-delay: 0.15s; background: var(--p1); }
+.dots span:nth-child(3) { animation-delay: 0.3s; background: var(--p2); }
+
+/* konfeti tuvali her seyin ustunde ama tiklanamaz */
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.grayed { filter: grayscale(1); opacity: 0.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
