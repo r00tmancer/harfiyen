@@ -593,10 +593,13 @@ export default function Game() {
           <WinWash mine={boomFx.mine} />
         </div>
       )}
-      <ScoreBar snap={snapshot} />
+      {/* telepati rekabet degil: vs yerine yan yana avatarlar + ortak kalp sayaci */}
+      {mode === 'telepati' ? <TelepatiScoreBar snap={snapshot} /> : <ScoreBar snap={snapshot} />}
       <div className="flex items-center gap-2 self-center">
         <div className="chip chip-soft">
-          {mode === 'zincir' ? 'Halka' : mode === 'bom' ? 'Sayı' : 'Raunt'} {snapshot.round}
+          {mode === 'zincir' ? 'Halka' : mode === 'bom' ? 'Sayı' : mode === 'telepati' ? 'Soru' : 'Raunt'}{' '}
+          {snapshot.round}
+          {mode === 'telepati' ? `/${TELEPATI_QUESTIONS}` : ''}
         </div>
         <div className="chip" style={{ background: 'color-mix(in srgb, var(--grape) 22%, #fff)' }}>
           {MODE_META[mode].name}
@@ -610,6 +613,8 @@ export default function Game() {
       {snapshot.phase === 'zincir_turn' && <ZincirTurn snap={snapshot} />}
       {snapshot.phase === 'bom_turn' && <BomTurn snap={snapshot} />}
       {snapshot.phase === 'uzun_race' && <UzunRace snap={snapshot} />}
+      {snapshot.phase === 'telepati_soru' && <TelepatiSoru snap={snapshot} />}
+      {snapshot.phase === 'telepati_reveal' && <TelepatiReveal snap={snapshot} />}
       {snapshot.phase === 'round_end' &&
         (mode === 'sayi' ? (
           <SayiRoundEnd snap={snapshot} />

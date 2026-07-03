@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { BOM_LIVES, ZINCIR_LIVES } from '@harfiyen/shared';
+import { BOM_LIVES, TELEPATI_QUESTIONS, ZINCIR_LIVES } from '@harfiyen/shared';
 import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
+import { IconHeartSolid } from '../ui/icons';
 import { MODE_META } from '../ui/modes';
 import { Hearts, MedalDots, PLAYER_CSS, WinWash } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
-import { paletteFor, rain } from '../fx/confetti';
+import { heartRain, paletteFor, rain } from '../fx/confetti';
 import { up } from '../hooks';
 
 // kupa: sun dolgulu, ink konturlu buyuk SVG
@@ -78,6 +79,24 @@ function PlayerScore({ snap, p, idx }: { snap: RoomSnapshot; p: PlayerPublic; id
   );
 }
 
+// telepati: ortak uyum yuzdesi ve maci bulunmayan ko-op sonucu
+function isKoopTelepati(snap: RoomSnapshot): boolean {
+  return snap.mode === 'telepati' && snap.winner === null && snap.phase === 'match_end';
+}
+
+// cifte kalple %100'u asabilir; asla kirpilmaz ('%110 uyum!' daha tatli)
+function telepatiPct(snap: RoomSnapshot): number {
+  const matches = snap.telepati?.matches ?? meOf(snap)?.score ?? 0;
+  return Math.round((matches / TELEPATI_QUESTIONS) * 100);
+}
+
+function uyumTitle(pct: number): string {
+  if (pct >= 90) return 'Ruh ikizisiniz!';
+  if (pct >= 70) return 'Kalpler aynı atıyor';
+  if (pct >= 50) return 'Fena değil, gelişiyorsunuz';
+  return 'Zıt kutuplar çeker derler...';
+}
+
 // StrictMode cift calismasina karsi: her mac sonu kutlamasi bir kez
 let celebratedSeq = -1;
 
@@ -101,7 +120,14 @@ export default function Victory() {
 
   useEffect(() => {
     // matchEndSeq 0 ise mac sonu mesaji bu oturumda gelmedi (sayfa yenileme) — kutlama yok
-    if (!snapshot || !winner || matchEndSeq === 0 || matchEndSeq === celebratedSeq) return;
+    if (!snapshot || matchEndSeq === 0 || matchEndSeq === celebratedSeq) return;
+    // ko-op telepati: kazanan yok, yuksek uyumda kalp yagmuru
+    if (isKoopTelepati(snapshot)) {
+      celebratedSeq = matchEndSeq;
+      if (telepatiPct(snapshot) >= 70) heartRain();
+      return;
+    }
+    if (!winner) return;
     celebratedSeq = matchEndSeq;
     rain(paletteFor(playerIndex(snapshot, winner.id)));
   }, [snapshot, winner, matchEndSeq]);
@@ -114,6 +140,91 @@ export default function Victory() {
   const oppIdx = myIdx === 0 ? 1 : 0;
   const mineWant = rematchWants.includes(snapshot.you);
   const oppWants = !!opp && rematchWants.includes(opp.id);
+
+  // rovans/yeni oda + durum rozetleri: iki varyantta da ayni
+  const footer = (
+    <>
+      {oppWants && !mineWant && (
+        <div className="chip chip-sun" role="status">
+          Rakip rövanş istiyor!
+        </div>
+      )}
+      {!oppConnected && (
+        <div className="chip chip-soft" role="status">
+          Rakip ayrıldı
+        </div>
+      )}
+
+      <div data-pop className="flex w-full flex-col gap-3">
+        <button
+          type="button"
+          className="btn-candy btn-mint btn-lg btn-block"
+          disabled={mineWant}
+          onClick={() => {
+            send({ t: 'rematch' });
+          }}
+        >
+          {mineWant ? `Rövanş istendi (${rematchWants.length}/2)` : 'Rövanş'}
+        </button>
+        <button type="button" className="btn-candy btn-block" onClick={() => leaveRoom()}>
+          Yeni oda
+        </button>
+      </div>
+    </>
+  );
+
+  // ---- ko-op telepati: kazanan yok, ortak uyum sonucu ----
+  if (isKoopTelepati(snapshot)) {
+    const matches = snapshot.telepati?.matches ?? me?.score ?? 0;
+    const pct = telepatiPct(snapshot);
+    return (
+      <div ref={root} className="flex w-full flex-col items-center gap-5 pt-8 pb-6 text-center">
+        {/* pembe yikamasi: bu modda renk taraf degil sevgi belirtir */}
+        <WinWash mine={false} />
+
+        <div data-pop className="flex items-center gap-3">
+          {me && <Avatar index={me.avatar} color={PLAYER_CSS[myIdx].main} size={64} />}
+          <span className="inline-flex" style={{ color: 'var(--p1)' }} aria-hidden="true">
+            <IconHeartSolid size={34} />
+          </span>
+          {opp && (
+            <Avatar
+              index={opp.avatar}
+              color={PLAYER_CSS[oppIdx].main}
+              size={64}
+              className={opp.connected ? '' : 'grayed'}
+            />
+          )}
+        </div>
+
+        <h1 data-pop className="font-display text-4xl font-extrabold">
+          Uyum Sonucu
+        </h1>
+
+        <div data-pop className="chip chip-soft">
+          {MODE_META.telepati.name}
+          {opp ? ` — ${me?.nick ?? ''} + ${opp.nick}` : ''}
+        </div>
+
+        <div data-pop className="card-candy w-full text-center">
+          <p className="uyum-pct" aria-label={`Yüzde ${pct} uyum`}>
+            %{pct}
+          </p>
+          <p className="mt-1 font-display text-2xl font-extrabold" style={{ color: 'var(--p1-dark)' }}>
+            {uyumTitle(pct)}
+          </p>
+          <p className="mt-3 flex items-center justify-center">
+            <span className="chip chip-p1 font-display text-base">
+              <IconHeartSolid size={15} style={{ color: 'var(--p1-dark)' }} />
+              {matches} uyum · {TELEPATI_QUESTIONS} soru
+            </span>
+          </p>
+        </div>
+
+        {footer}
+      </div>
+    );
+  }
 
   return (
     <div ref={root} className="flex w-full flex-col items-center gap-5 pt-8 pb-6 text-center">
@@ -153,32 +264,7 @@ export default function Victory() {
         </div>
       )}
 
-      {oppWants && !mineWant && (
-        <div className="chip chip-sun" role="status">
-          Rakip rövanş istiyor!
-        </div>
-      )}
-      {!oppConnected && (
-        <div className="chip chip-soft" role="status">
-          Rakip ayrıldı
-        </div>
-      )}
-
-      <div data-pop className="flex w-full flex-col gap-3">
-        <button
-          type="button"
-          className="btn-candy btn-mint btn-lg btn-block"
-          disabled={mineWant}
-          onClick={() => {
-            send({ t: 'rematch' });
-          }}
-        >
-          {mineWant ? `Rövanş istendi (${rematchWants.length}/2)` : 'Rövanş'}
-        </button>
-        <button type="button" className="btn-candy btn-block" onClick={() => leaveRoom()}>
-          Yeni oda
-        </button>
-      </div>
+      {footer}
     </div>
   );
 }

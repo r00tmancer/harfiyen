@@ -731,6 +731,104 @@ body {
   color: var(--sun);
 }
 
+/* ---- telepati: uyum testi ---- */
+/* soru ilerleme noktalari: gecilen pembe, aktif sari ve buyuk */
+.q-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 2px solid var(--ink-soft);
+  opacity: 0.5;
+  transition: transform 150ms ease, background 150ms ease, opacity 150ms ease;
+}
+.q-dot.done { background: var(--p1); border-color: var(--ink); opacity: 1; }
+.q-dot.cur { background: var(--sun); border-color: var(--ink); opacity: 1; transform: scale(1.35); }
+
+/* dev cevap butonlari (btn-candy uzerine): basparmak dostu, avatar + metin alt alta */
+.telepati-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 104px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 10px;
+  font-size: 20px;
+  border-radius: 24px;
+  white-space: normal;
+  line-height: 1.15;
+}
+.telepati-btn.sel {
+  background: var(--p1-soft);
+  border-color: var(--p1-dark);
+  transform: scale(1.03) rotate(-1deg);
+}
+/* kilitlenince secili buton canli kalir, digeri btn-candy:disabled ile soluklasir */
+.telepati-btn.sel:disabled { opacity: 1; cursor: default; }
+
+/* cifte kalp jokeri: joker-btn'in pembe hali */
+.joker-love { background: var(--p1-soft); }
+.joker-count-love { background: var(--p1); }
+
+/* doubled aktif: chip pembe parlar */
+.pulse-love {
+  background: var(--p1-soft);
+  border-color: var(--p1-dark);
+  color: var(--p1-dark);
+  animation: love-pulse 1.1s ease-in-out infinite;
+}
+@keyframes love-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--p1) 55%, transparent); }
+  60% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--p1) 0%, transparent); }
+}
+
+/* reveal sahnesi: avatarlar + UYUM! splash */
+.telepati-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 112px;
+  padding-top: 18px;
+}
+.uyum-splash {
+  position: absolute;
+  top: -10px;
+  z-index: 6;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(40px, 14vw, 62px);
+  color: var(--p1);
+  text-shadow: 0 5px 0 var(--shadow-ink);
+  animation: uyum-pop 1.15s ease-out both;
+}
+@keyframes uyum-pop {
+  0% { transform: scale(0.3) rotate(-6deg); opacity: 0; }
+  35% { transform: scale(1.16) rotate(2deg); opacity: 1; }
+  75% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.06); opacity: 0; }
+}
+
+/* eslesmedi: uzucu degil, tatli bir sallanma */
+.miss-sway {
+  animation: miss-sway 1.4s ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+@keyframes miss-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+/* zafer ekrani: dev uyum yuzdesi (cifte kalple %100'u asabilir) */
+.uyum-pct {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(64px, 26vw, 104px);
+  line-height: 1;
+  color: var(--p1-dark);
+  text-shadow: 0 7px 0 var(--shadow-ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
