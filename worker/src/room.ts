@@ -36,6 +36,7 @@ import * as sayi from './game/modes/sayi';
 import * as zincir from './game/modes/zincir';
 import * as uzun from './game/modes/uzun';
 import * as bom from './game/modes/bom';
+import * as telepati from './game/modes/telepati';
 import type { Env } from './env';
 import wordsRaw from './data/words.txt';
 import pairsJson from './data/pairs.json';
@@ -45,7 +46,7 @@ const CLEANUP_MS = 10 * 60_000;
 const STATE_KEY = 'state';
 const FALLBACK_NICK = 'Oyuncu';
 
-const MODES: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom'];
+const MODES: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom', 'telepati'];
 function isGameMode(x: unknown): x is GameMode {
   return typeof x === 'string' && (MODES as string[]).includes(x);
 }
@@ -132,6 +133,7 @@ export class GameRoom extends DurableObject<Env> {
       zincir: null,
       uzun: null,
       bom: null,
+      telepati: null,
     };
     await this.ctx.storage.setAlarm(Date.now() + CLEANUP_MS);
     await this.save(state);
@@ -248,6 +250,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'bom_press':
         await bom.onPress(this.mc(), state, player, msg.kind);
         break;
+      case 'telepati_answer':
+        await telepati.onAnswer(this.mc(), state, player, msg.choice);
+        break;
       case 'submit_word':
         if (state.mode === 'zincir') await zincir.onSubmit(this.mc(), state, player, ws, msg.word);
         else if (state.mode === 'uzun') await uzun.onSubmit(this.mc(), state, player, ws, msg.word);
@@ -292,6 +297,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'bom':
         await bom.onJoker(this.mc(), state, player);
         break;
+      case 'telepati':
+        await telepati.onJoker(this.mc(), state, player);
+        break;
     }
   }
 
@@ -321,6 +329,9 @@ export class GameRoom extends DurableObject<Env> {
         break;
       case 'bom':
         await bom.startMatch(this.mc(), state);
+        break;
+      case 'telepati':
+        await telepati.startMatch(this.mc(), state);
         break;
     }
   }
@@ -433,6 +444,7 @@ export class GameRoom extends DurableObject<Env> {
       state.zincir = null;
       state.uzun = null;
       state.bom = null;
+      state.telepati = null; // rovansta taze soru alt kumesi kurulur
       // mod rovansta korunur; her mod kendi durumunu bastan kurar
       await this.startMode(state);
       return;
@@ -451,6 +463,7 @@ export class GameRoom extends DurableObject<Env> {
     state.zincir = null;
     state.uzun = null;
     state.bom = null;
+    state.telepati = null;
     for (const p of state.players) p.pickedLetter = null;
     state.deadline = Date.now() + PICK_MS;
     state.alarmPurpose = 'phase';
@@ -527,6 +540,7 @@ export class GameRoom extends DurableObject<Env> {
         if (state.mode === 'uzun') await uzun.startRace(this.mc(), state);
         else if (state.mode === 'zincir') await zincir.startTurn(this.mc(), state);
         else if (state.mode === 'bom') await bom.startTurn(this.mc(), state);
+        else if (state.mode === 'telepati') await telepati.startQuestion(this.mc(), state);
         else await this.startRacing(state); // harf
         break;
       case 'racing': {
@@ -555,6 +569,12 @@ export class GameRoom extends DurableObject<Env> {
         break;
       case 'uzun_race':
         await uzun.onRaceDeadline(this.mc(), state);
+        break;
+      case 'telepati_soru':
+        await telepati.onAnswerDeadline(this.mc(), state);
+        break;
+      case 'telepati_reveal':
+        await telepati.onRevealDone(this.mc(), state);
         break;
       case 'round_end':
         if (state.mode === 'sayi') {
@@ -643,6 +663,7 @@ export class GameRoom extends DurableObject<Env> {
       state.zincir ??= null;
       state.uzun ??= null;
       state.bom ??= null;
+      state.telepati ??= null;
     }
     return state;
   }
@@ -724,6 +745,23 @@ export class GameRoom extends DurableObject<Env> {
 
     const uzunSnap = state.uzun ? { submitted: state.uzun.submitted } : null;
 
+    // Telepati: ham secimler reveal'e kadar ASLA sizmaz; alici yalniz kisiye ozel
+    // myAnswered/oppAnswered bayraklarini gorur. Soru geri sayim bitmeden acilmaz.
+    const telepatiQ = state.telepati ? state.telepati.questions[state.telepati.qIndex - 1] : undefined;
+    const telepatiVisible =
+      state.phase === 'telepati_soru' || state.phase === 'telepati_reveal' || state.phase === 'match_end';
+    const telepatiSnap =
+      state.telepati && telepatiQ && telepatiVisible
+        ? {
+            qIndex: state.telepati.qIndex,
+            question: telepatiQ,
+            matches: state.telepati.matches,
+            myAnswered: state.telepati.answers[you] !== undefined,
+            oppAnswered: opp ? state.telepati.answers[opp.id] !== undefined : false,
+            doubled: state.telepati.doubled,
+          }
+        : null;
+
     // Bom: gizli alan yok; sunucu durumu oldugu gibi gorunur.
     const bomSnap = state.bom
       ? {
@@ -760,6 +798,7 @@ export class GameRoom extends DurableObject<Env> {
       zincir: zincirSnap,
       uzun: uzunSnap,
       bom: bomSnap,
+      telepati: telepatiSnap,
     };
   }
 }

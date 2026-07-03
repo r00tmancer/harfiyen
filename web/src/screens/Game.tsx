@@ -6,6 +6,7 @@ import {
   PICK_MS,
   RACE_MS,
   SUBMIT_THROTTLE_MS,
+  TELEPATI_QUESTIONS,
   TR_LETTERS,
   ZINCIR_LIVES,
 } from '@harfiyen/shared';
@@ -13,25 +14,88 @@ import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, REJECT_TEXT, useStore } from '../store';
 import { send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
-import { IconSnowflake, IconSwap } from '../ui/icons';
+import { IconHeartSolid, IconSnowflake, IconSwap } from '../ui/icons';
 import { MODE_META } from '../ui/modes';
 import { Hearts, MedalDots, PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/parts';
 import { useRemaining, up } from '../hooks';
-import { acceptPunch, dropIn, microShake, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
+import { acceptPunch, dropIn, jelly, microShake, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
 import { burst, paletteFor } from '../fx/confetti';
 import { SayiPick, SayiRoundEnd, SayiTurn } from './modes/SayiGame';
 import { ZincirTurn } from './modes/ZincirGame';
 import { UzunRace, UzunReveal } from './modes/UzunGame';
 import { BomTurn } from './modes/BomGame';
+import { TelepatiReveal, TelepatiSoru } from './modes/TelepatiGame';
 
-// skor gostergesi moda gore: harf/uzun yildiz, sayi madalya, zincir/bom kalp
+// skor gostergesi moda gore: harf/uzun yildiz, sayi madalya, zincir/bom kalp, telepati ortak uyum
 function ScoreGauge({ snap, p }: { snap: RoomSnapshot; p: PlayerPublic }) {
   if (snap.mode === 'sayi') return <MedalDots wins={snap.sayi?.roundWins[p.id] ?? 0} size={16} />;
   if (snap.mode === 'zincir')
     return <Hearts lives={snap.zincir?.lives[p.id] ?? ZINCIR_LIVES} size={16} />;
   if (snap.mode === 'bom')
     return <Hearts lives={snap.bom?.lives[p.id] ?? BOM_LIVES} size={16} max={BOM_LIVES} />;
+  if (snap.mode === 'telepati')
+    return (
+      <span
+        className="flex items-center gap-1 font-display text-[13px] font-extrabold"
+        style={{ color: 'var(--p1-dark)' }}
+        aria-label={`${snap.telepati?.matches ?? 0} uyum`}
+      >
+        <IconHeartSolid size={13} />
+        {snap.telepati?.matches ?? 0} uyum
+      </span>
+    );
   return <Stars score={p.score} size={17} />;
+}
+
+// telepati skor bari: rekabet yok — iki avatar yan yana, arada kalp, ortak uyum sayaci
+function TelepatiScoreBar({ snap }: { snap: RoomSnapshot }) {
+  const me = meOf(snap);
+  const opp = oppOf(snap);
+  const myIdx = me ? playerIndex(snap, me.id) : 0;
+  const oppIdx = myIdx === 0 ? 1 : 0;
+  const matches = snap.telepati?.matches ?? 0;
+  const countRef = useRef<HTMLSpanElement>(null);
+  const prev = useRef(matches);
+
+  // uyum artinca sayac jelly ziplar
+  useEffect(() => {
+    if (matches > prev.current) jelly(countRef.current);
+    prev.current = matches;
+  }, [matches]);
+
+  return (
+    <div
+      className="flex items-center justify-between gap-2 rounded-2xl border-[3px] px-3 py-2"
+      style={{
+        borderColor: 'var(--ink)',
+        background: 'var(--p1-soft)',
+        boxShadow: '0 4px 0 var(--shadow-ink)',
+      }}
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
+        {me && <Avatar index={me.avatar} color={PLAYER_CSS[myIdx].main} size={38} />}
+        <span className="inline-flex shrink-0" style={{ color: 'var(--p1)' }} aria-hidden="true">
+          <IconHeartSolid size={20} />
+        </span>
+        {opp && (
+          <Avatar
+            index={opp.avatar}
+            color={PLAYER_CSS[oppIdx].main}
+            size={38}
+            className={opp.connected ? '' : 'grayed'}
+          />
+        )}
+        <p className="font-display min-w-0 truncate text-[13px] leading-tight font-bold">
+          {me?.nick ?? ''}
+          {opp ? ` + ${opp.nick}` : ''}
+        </p>
+      </div>
+      <span ref={countRef} className="chip chip-p1 font-display shrink-0 text-base">
+        <IconHeartSolid size={15} style={{ color: 'var(--p1-dark)' }} />
+        {matches} uyum
+      </span>
+    </div>
+  );
 }
 
 // ---- ust skor bari ----

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { RACE_MS, SAYI_TURN_MS, ZINCIR_START_MS } from '@harfiyen/shared';
+import { RACE_MS, SAYI_TURN_MS, TELEPATI_REVEAL_MS, ZINCIR_START_MS } from '@harfiyen/shared';
 import type {
   JokerKind,
   Phase,
@@ -126,6 +126,17 @@ interface HarfiyenStore {
     seq: number;
   } | null;
 
+  // ---- telepati ----
+  myTelepatiChoice: string | null; // bu soruda verdigim cevap (secili buton gorseli)
+  telepatiReveal: {
+    match: boolean;
+    answers: Record<string, string>; // ab: 'a'|'b'; kim: isaret edilen pid
+    matches: number;
+    doubled: boolean;
+    qIndex: number;
+    seq: number;
+  } | null;
+
   setNick(n: string): void;
   setAvatar(i: number): void;
   setJoinCode(c: string): void;
@@ -136,6 +147,7 @@ interface HarfiyenStore {
   enterRoom(code: string): void;
   pickLetterLocal(letter: string): void;
   uzunTryLocal(word: string): void;
+  telepatiAnswerLocal(choice: 'a' | 'b' | 'ben' | 'o'): void;
   leaveToHome(): void;
   remainingMs(): number;
   apply(msg: ServerMsg): void;
@@ -168,6 +180,8 @@ const roomDefaults = {
   uzunExtra: false,
   uzunLocked: null,
   uzunReveal: null,
+  myTelepatiChoice: null as string | null,
+  telepatiReveal: null,
 };
 
 export const useStore = create<HarfiyenStore>()((set, get) => ({
@@ -204,6 +218,19 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
   uzunTryLocal: (word) =>
     set((st) => ({ myUzunTries: [...st.myUzunTries, { word, rejected: false }] })),
 
+  // (telepati) ilk cevap yerelde kilitlenir; sunucu snapshot'i gelince kesinlesir
+  telepatiAnswerLocal: (choice) =>
+    set((st) => {
+      const patch: Partial<HarfiyenStore> = { myTelepatiChoice: choice };
+      if (st.snapshot?.telepati) {
+        patch.snapshot = {
+          ...st.snapshot,
+          telepati: { ...st.snapshot.telepati, myAnswered: true },
+        };
+      }
+      return patch;
+    }),
+
   leaveToHome: () => set({ ...roomDefaults, screen: 'home', fromLink: false, joinCode: '' }),
 
   remainingMs: () => {
@@ -236,6 +263,8 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               patch.zincirBoom = null;
               patch.lastBom = null;
               patch.uzunReveal = null;
+              patch.telepatiReveal = null;
+              patch.myTelepatiChoice = null;
             }
             if (s.phase === 'picking') {
               patch.myLetter = null;
@@ -253,6 +282,8 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               patch.thermoArmedBy = null;
               patch.roundResult = null;
             }
+            // her yeni soruda onceki cevabin kilidi acilir
+            if (s.phase === 'telepati_soru') patch.myTelepatiChoice = null;
             if (s.phase === 'lobby') patch.rematchWants = [];
           }
           return patch;
@@ -482,6 +513,33 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
           };
         }
 
+        // ---- telepati ----
+        case 'telepati_reveal': {
+          const patch: Partial<HarfiyenStore> = {
+            telepatiReveal: {
+              match: msg.match,
+              answers: msg.answers,
+              matches: msg.matches,
+              doubled: msg.doubled,
+              qIndex: msg.qIndex,
+              seq: (st.telepatiReveal?.seq ?? 0) + 1,
+            },
+          };
+          if (st.snapshot?.telepati) {
+            patch.snapshot = {
+              ...st.snapshot,
+              phase: 'telepati_reveal',
+              deadline: Date.now() + TELEPATI_REVEAL_MS, // sunucu snapshot'i gelince kesinlesir
+              telepati: {
+                ...st.snapshot.telepati,
+                matches: msg.matches,
+                doubled: msg.doubled,
+              },
+            };
+          }
+          return patch;
+        }
+
         // ---- en uzun kelime ----
         case 'uzun_locked': {
           const patch: Partial<HarfiyenStore> = {
@@ -562,6 +620,10 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
               ...snap,
               bom: { ...snap.bom, insured: { ...snap.bom.insured, [msg.by]: true } },
             };
+          }
+          // cifte kalp: bu soru eslesirse 2 puan sayilir
+          if (msg.kind === 'cifte_kalp' && snap.telepati) {
+            snap = { ...snap, telepati: { ...snap.telepati, doubled: true } };
           }
           patch.snapshot = snap;
           return patch;

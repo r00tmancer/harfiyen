@@ -1,7 +1,7 @@
 // GameRoom kalici durum modelleri ve mod isleyicilerinin kullandigi baglam arayuzu.
 // Sunucu tarafi durum, snapshot'tan AYRIDIR: gizli bilgiler (sayi sirlari) burada tutulur,
 // snapshot'a asla sizmaz (round_end aralik-daraltma acilimi haric).
-import type { GameMode, Phase, ServerMsg } from '@harfiyen/shared';
+import type { GameMode, Phase, ServerMsg, TelepatiQuestion } from '@harfiyen/shared';
 
 export interface PlayerState {
   id: string;
@@ -41,6 +41,16 @@ export interface UzunServer {
   submitted: Record<string, boolean>; // pid -> kilitlendi mi (hak kalmadi)
 }
 
+// Telepati: ham secimler ('a'|'b'|'ben'|'o') reveal'e kadar SADECE sunucuda tutulur,
+// snapshot'a yalniz answered bayraklari iner.
+export interface TelepatiServer {
+  questions: TelepatiQuestion[]; // maca ozel rastgele soru alt kumesi (rovansta tazelenir)
+  qIndex: number; // 1..TELEPATI_QUESTIONS
+  answers: Record<string, string>; // pid -> ham secim (ilk cevap kilitler)
+  matches: number; // ORTAK uyum puani
+  doubled: boolean; // bu soruda cifte kalp aktif mi
+}
+
 // 7 Bom: gizli alan yok; snapshot'taki BomState ile ayni sekil.
 export interface BomServer {
   lives: Record<string, number>; // pid -> kalan can
@@ -69,6 +79,7 @@ export interface RoomState {
   zincir: ZincirServer | null;
   uzun: UzunServer | null;
   bom: BomServer | null;
+  telepati: TelepatiServer | null;
 }
 
 // Mod isleyicilerine verilen dar baglam. GameRoom bu metotlari saglar; boylece

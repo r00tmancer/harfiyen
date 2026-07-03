@@ -138,6 +138,17 @@ export function flipIn(el: Element | null, delay = 0): void {
   );
 }
 
+// telepati eslesmesi: iki avatar birbirine sokulup birlikte ziplar
+export function snuggle(left: Element | null, right: Element | null): void {
+  if (!left || !right || reducedMotion()) return;
+  const tl = gsap.timeline();
+  tl.to(left, { x: 9, duration: 0.22, ease: 'power2.out' }, 0)
+    .to(right, { x: -9, duration: 0.22, ease: 'power2.out' }, 0)
+    .to([left, right], { y: -16, duration: 0.18, ease: 'power1.out' }, 0.22)
+    .to([left, right], { y: 0, duration: 0.5, ease: 'bounce.out' }, 0.4)
+    .to([left, right], { x: 0, duration: 0.3, ease: 'power2.inOut', clearProps: 'x,y' }, 1.25);
+}
+
 // yukari/asagi ok ziplamasi: dy yonunde itip yerine oturt
 export function nudgeY(el: Element | null, dy: number): void {
   if (!el || reducedMotion()) return;

@@ -16,8 +16,13 @@ export const JOKER_FREEZE_MS = 5_000; // buz jokeri: rakibin yazma alanı bu kad
 export const JOKER_PER_ROUNDS = 5; // her 5 raundluk blok için 1 joker hakkı (1. ve 6. raundda dolar)
 
 // ---- Oyun modları ----
-export type GameMode = 'harf' | 'sayi' | 'zincir' | 'uzun' | 'bom';
+export type GameMode = 'harf' | 'sayi' | 'zincir' | 'uzun' | 'bom' | 'telepati';
 export const DEFAULT_MODE: GameMode = 'harf';
+
+// Telepati (Uyum Testi) — ko-op: aynı soruya gizlice cevap verin, uyuşursa ortak puan
+export const TELEPATI_QUESTIONS = 10; // maç başına soru
+export const TELEPATI_ANSWER_MS = 15_000;
+export const TELEPATI_REVEAL_MS = 3_500;
 
 // Bom (7 Bom): sırayla say, 7'nin katı veya içinde 7 geçen sayıda BOM de
 export const BOM_LIVES = 3;
@@ -52,13 +57,14 @@ export const UZUN_ROUND_MS = 30_000; // tek gönderimlik yarış süresi
 export const UZUN_TARGET = 5; // maçı kazanmak için puan
 
 // Mod başına joker türü (UI metni istemcide)
-export type JokerKind = 'buz' | 'termometre' | 'pas' | 'cifte_sans' | 'sigorta';
+export type JokerKind = 'buz' | 'termometre' | 'pas' | 'cifte_sans' | 'sigorta' | 'cifte_kalp';
 export const MODE_JOKER: Record<GameMode, JokerKind> = {
   harf: 'buz',
   sayi: 'termometre',
   zincir: 'pas',
   uzun: 'cifte_sans',
   bom: 'sigorta', // bir sonraki hatanı affeder (can gitmez)
+  telepati: 'cifte_kalp', // bu soru eşleşirse 2 puan sayılır
 };
 
 export const TR_LETTERS = [
@@ -102,6 +108,8 @@ export type Phase =
   | 'zincir_turn' // (zincir) sıradaki oyuncu kelime yazıyor, bomba tıkırdıyor
   | 'uzun_race' // (uzun) tek gönderimlik uzun kelime yarışı
   | 'bom_turn' // (bom) sıradaki oyuncu sayıya ya da BOM'a basıyor
+  | 'telepati_soru' // (telepati) iki oyuncu da gizlice cevaplıyor
+  | 'telepati_reveal' // (telepati) cevaplar açıldı, eşleşme gösteriliyor
   | 'round_end' // raund sonucu gösteriliyor
   | 'match_end'; // maç bitti
 
@@ -133,6 +141,22 @@ export interface BomState {
   insured: Record<string, boolean>; // sigorta jokeri aktif mi (bir hatayı affeder)
 }
 
+export interface TelepatiQuestion {
+  type: 'kim' | 'ab';
+  q: string;
+  a?: string; // ab tipinde şık metinleri
+  b?: string;
+}
+
+export interface TelepatiState {
+  qIndex: number; // 1..TELEPATI_QUESTIONS
+  question: TelepatiQuestion;
+  matches: number; // eşleşen soru puanı (çifte kalp ile bir soru 2 sayılabilir)
+  myAnswered: boolean;
+  oppAnswered: boolean;
+  doubled: boolean; // bu soruda çifte kalp aktif mi
+}
+
 export interface PlayerPublic {
   id: string;
   nick: string;
@@ -161,6 +185,7 @@ export interface RoomSnapshot {
   zincir: ZincirState | null;
   uzun: UzunState | null;
   bom: BomState | null;
+  telepati: TelepatiState | null;
 }
 
 // ---- Mesajlar: istemci -> sunucu ----
@@ -172,6 +197,7 @@ export type ClientMsg =
   | { t: 'pick_number'; value: number } // (sayi) gizli sayı seçimi
   | { t: 'guess'; value: number } // (sayi) sıradaki tahmin
   | { t: 'bom_press'; kind: 'number' | 'bom' } // (bom) sıradaki oyuncunun seçimi
+  | { t: 'telepati_answer'; choice: 'a' | 'b' | 'ben' | 'o' } // (telepati) gizli cevap
   | { t: 'use_joker' } // moda özel joker (MODE_JOKER)
   | { t: 'rematch' };
 
@@ -220,6 +246,16 @@ export type ServerMsg =
       next: number; // sıradaki sayı
       turnMs: number;
     }
+  // Telepati
+  | {
+      t: 'telepati_reveal';
+      match: boolean;
+      // cevaplar: ab tipinde 'a'|'b'; kim tipinde işaret edilen OYUNCUNUN pid'i (UI nick'e çevirir)
+      answers: Record<string, string>; // cevaplamayan oyuncunun anahtarı hiç yer almaz
+      matches: number; // güncel toplam (çifte kalp uygulanmış)
+      doubled: boolean; // bu soru 2 puan mı sayıldı
+      qIndex: number;
+    }
   // En Uzun Kelime
   | { t: 'uzun_locked'; by: string } // oyuncu kelimesini kilitledi (kelime gizli)
   | {
@@ -228,7 +264,7 @@ export type ServerMsg =
       winner: string | null;
       scores: Record<string, number>;
     }
-  | { t: 'match_end'; winner: string; scores: Record<string, number>; word: string | null } // word = maçı bitiren kelime (kelime modları)
+  | { t: 'match_end'; winner: string | null; scores: Record<string, number>; word: string | null } // winner null = ko-op mod (telepati); word = maçı bitiren kelime (kelime modları)
   | { t: 'rematch_state'; want: string[] } // rövanş isteyen oyuncu id'leri
   | { t: 'opp_conn'; connected: boolean }
   | { t: 'error'; code: 'room_full' | 'not_found' | 'bad_msg'; msg?: string };

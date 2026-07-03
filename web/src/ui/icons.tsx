@@ -197,6 +197,29 @@ export function IconCrown({ size = 22, ...props }: { size?: number } & SVGProps<
   );
 }
 
+// ic ice iki kalp: telepati modu + cifte kalp jokeri
+export function IconHeartsDuo({ size = 22, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M9.6 15.4S3.8 11.9 2.2 8.2C1 5.7 2.5 3.1 5.2 3.1c1.7 0 3 1 4.4 2.6 1.3-1.6 2.7-2.6 4.4-2.6 2.7 0 4.2 2.6 3 5.1-1.6 3.7-7.4 7.2-7.4 7.2z" />
+      <path
+        d="M17.1 20.7S13 18.2 11.9 15.7c-.8-1.9.3-3.7 2.1-3.7 1.2 0 2.1.7 3.1 1.8.9-1.1 1.9-1.8 3.1-1.8 1.9 0 3 1.8 2.1 3.6-1.2 2.6-5.2 5.1-5.2 5.1z"
+        fill="currentColor"
+        fillOpacity={0.25}
+      />
+    </svg>
+  );
+}
+
+// dolu kalp: uyum sayaci + avatarlar arasi kalp
+export function IconHeartSolid({ size = 16, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden {...props}>
+      <path d="M12 20.4S4.6 15.9 2.5 11.2C1 7.9 3 4.6 6.4 4.6c2.2 0 3.9 1.3 5.6 3.3 1.7-2 3.4-3.3 5.6-3.3 3.4 0 5.4 3.3 3.9 6.6-2.1 4.7-9.5 9.2-9.5 9.2z" />
+    </svg>
+  );
+}
+
 // yukari / asagi ok: tahmin sonucu
 export function IconArrowUp({ size = 18, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
   return (

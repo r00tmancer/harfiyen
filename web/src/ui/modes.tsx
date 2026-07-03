@@ -1,10 +1,10 @@
 import type { ComponentType } from 'react';
 import type { SVGProps } from 'react';
 import type { GameMode } from '@harfiyen/shared';
-import { IconBomb, IconBurst, IconRuler, IconTarget, IconTilesDuo } from './icons';
+import { IconBomb, IconBurst, IconHeartsDuo, IconRuler, IconTarget, IconTilesDuo } from './icons';
 
 // mod tanitim metinleri + ikonlari (lobi karti, oyun basligi, zafer ekrani)
-export const MODE_ORDER: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom'];
+export const MODE_ORDER: GameMode[] = ['harf', 'sayi', 'zincir', 'uzun', 'bom', 'telepati'];
 
 export interface ModeMeta {
   name: string;
@@ -43,5 +43,11 @@ export const MODE_META: Record<GameMode, ModeMeta> = {
     desc: "Sırayla say: 7'nin katı ve içinde 7 olan sayıda BOM de!",
     joker: 'Joker: Sigorta — bir hatayı affeder',
     Icon: IconBurst,
+  },
+  telepati: {
+    name: 'Telepati',
+    desc: 'Aynı soruya gizlice cevap verin — uyuşursa puan!',
+    joker: 'Joker: Çifte Kalp — o soru 2 puan',
+    Icon: IconHeartsDuo,
   },
 };
