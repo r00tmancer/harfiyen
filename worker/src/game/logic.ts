@@ -5,6 +5,8 @@ import {
   BOM_START_MS,
   JOKER_PER_ROUNDS,
   MIN_WORD_LEN,
+  REACTION_COUNT,
+  REACTION_THROTTLE_MS,
   SAYI_BAND_ILIK,
   SAYI_BAND_KAYNIYOR,
   SAYI_BAND_SICAK,
@@ -30,6 +32,14 @@ export function jokerGrantedOnRound(round: number): boolean {
 // Joker kullanma kosulu: hak var ve rakip su an zaten donuk degil.
 export function canUseJoker(jokers: number, opponentFrozenNow: boolean): boolean {
   return jokers > 0 && !opponentFrozenNow;
+}
+
+// Tepki (sticker): id 0..REACTION_COUNT-1 tamsayi olmali ve oyuncunun son tepkisinden
+// REACTION_THROTTLE_MS gecmis olmali. Tam sinirda (now - last === throttle) izin verilir.
+export function canReact(id: unknown, lastReactAt: number, now: number): boolean {
+  if (typeof id !== 'number' || !Number.isInteger(id)) return false;
+  if (id < 0 || id >= REACTION_COUNT) return false;
+  return now - lastReactAt >= REACTION_THROTTLE_MS;
 }
 
 export type WordVerdict =

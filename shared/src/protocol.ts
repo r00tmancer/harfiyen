@@ -24,6 +24,10 @@ export const TELEPATI_QUESTIONS = 10; // maç başına soru
 export const TELEPATI_ANSWER_MS = 15_000;
 export const TELEPATI_REVEAL_MS = 3_500;
 
+// Tepkiler: maç içi sticker gönderimi
+export const REACTION_COUNT = 6; // sticker id: 0..5
+export const REACTION_THROTTLE_MS = 3_000;
+
 // Bom (7 Bom): sırayla say, 7'nin katı veya içinde 7 geçen sayıda BOM de
 export const BOM_LIVES = 3;
 export const BOM_DIGIT = 7;
@@ -199,6 +203,7 @@ export type ClientMsg =
   | { t: 'bom_press'; kind: 'number' | 'bom' } // (bom) sıradaki oyuncunun seçimi
   | { t: 'telepati_answer'; choice: 'a' | 'b' | 'ben' | 'o' } // (telepati) gizli cevap
   | { t: 'use_joker' } // moda özel joker (MODE_JOKER)
+  | { t: 'react'; id: number } // sticker tepkisi (0..REACTION_COUNT-1), sunucu 3sn throttle uygular
   | { t: 'rematch' };
 
 // ---- Mesajlar: sunucu -> istemci ----
@@ -266,6 +271,7 @@ export type ServerMsg =
     }
   | { t: 'match_end'; winner: string | null; scores: Record<string, number>; word: string | null } // winner null = ko-op mod (telepati); word = maçı bitiren kelime (kelime modları)
   | { t: 'rematch_state'; want: string[] } // rövanş isteyen oyuncu id'leri
+  | { t: 'reaction'; by: string; id: number } // sticker tepkisi yayını
   | { t: 'opp_conn'; connected: boolean }
   | { t: 'error'; code: 'room_full' | 'not_found' | 'bad_msg'; msg?: string };
 

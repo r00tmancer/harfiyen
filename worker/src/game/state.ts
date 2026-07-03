@@ -13,6 +13,7 @@ export interface PlayerState {
   pickedLetter: string | null; // secilen harf gizli tutulur, snapshot'ta boolean'a indirgenir
   rematch: boolean;
   lastSubmitAt: number;
+  lastReactAt: number; // tepki throttle'i; kalici tutulur (hibernation'a dayanikli)
 }
 
 // ---- Moda ozel sunucu durumlari (gizli alanlar dahil) ----

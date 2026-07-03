@@ -9,6 +9,7 @@ import { PLAYER_CSS, TimerBar } from '../../ui/parts';
 import { useRemaining } from '../../hooks';
 import { flipIn, popIn, snuggle, staggerIn } from '../../fx/anim';
 import { heartBurst } from '../../fx/confetti';
+import { haptics } from '../../fx/haptics';
 
 // soru ilerleme noktalari: gecilenler pembe, aktif sari ve buyuk
 export function QDots({ qIndex }: { qIndex: number }) {
@@ -228,6 +229,7 @@ export function TelepatiReveal({ snap }: { snap: RoomSnapshot }) {
     flipIn(oppCard.current, 0.1);
     if (reveal.match) {
       heartBurst();
+      haptics.accept(); // uyum = kabul deseni
       snuggle(myAv.current, oppAv.current);
       popIn(heartRef.current, 0.3);
     }

@@ -1,15 +1,18 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BOM_LIVES, TELEPATI_QUESTIONS, ZINCIR_LIVES } from '@harfiyen/shared';
 import type { PlayerPublic, RoomSnapshot } from '@harfiyen/shared';
 import { meOf, oppOf, playerIndex, useStore } from '../store';
 import { leaveRoom, send } from '../net/ws';
 import { Avatar } from '../ui/avatars';
-import { IconHeartSolid } from '../ui/icons';
+import { IconHeartSolid, IconShare } from '../ui/icons';
 import { MODE_META } from '../ui/modes';
 import { Hearts, MedalDots, PLAYER_CSS, WinWash } from '../ui/parts';
 import { staggerIn } from '../fx/anim';
 import { heartRain, paletteFor, rain } from '../fx/confetti';
+import { haptics } from '../fx/haptics';
 import { up } from '../hooks';
+
+const GAME_URL = 'https://harfiyen.r00tmancer.workers.dev';
 
 // kupa: sun dolgulu, ink konturlu buyuk SVG
 function Trophy({ size = 120 }: { size?: number }) {
@@ -97,6 +100,53 @@ function uyumTitle(pct: number): string {
   return 'Zıt kutuplar çeker derler...';
 }
 
+// paylasim skoru: zincir/bom kalan can, sayi raund, digerleri puan
+function scorelineOf(snap: RoomSnapshot): string {
+  const me = meOf(snap);
+  const opp = oppOf(snap);
+  if (!me || !opp) return '';
+  const mine = livesOf(snap, me) ?? finalScoreOf(snap, me);
+  const theirs = livesOf(snap, opp) ?? finalScoreOf(snap, opp);
+  return `${mine}-${theirs}`;
+}
+
+// paylas: varsa yerli paylasim menusu, yoksa panoya kopyala + rozet
+function ShareButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text });
+      } catch {
+        // kullanici vazgecti
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // pano izni yok: sessiz gec
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button type="button" className="btn-candy btn-block" onClick={() => void share()}>
+        <IconShare />
+        Paylaş
+      </button>
+      {copied && (
+        <span className="chip chip-ok" role="status">
+          Kopyalandı!
+        </span>
+      )}
+    </div>
+  );
+}
+
 // StrictMode cift calismasina karsi: her mac sonu kutlamasi bir kez
 let celebratedSeq = -1;
 
@@ -124,11 +174,13 @@ export default function Victory() {
     // ko-op telepati: kazanan yok, yuksek uyumda kalp yagmuru
     if (isKoopTelepati(snapshot)) {
       celebratedSeq = matchEndSeq;
+      haptics.victory();
       if (telepatiPct(snapshot) >= 70) heartRain();
       return;
     }
     if (!winner) return;
     celebratedSeq = matchEndSeq;
+    haptics.victory();
     rain(paletteFor(playerIndex(snapshot, winner.id)));
   }, [snapshot, winner, matchEndSeq]);
 
@@ -141,7 +193,14 @@ export default function Victory() {
   const mineWant = rematchWants.includes(snapshot.you);
   const oppWants = !!opp && rematchWants.includes(opp.id);
 
-  // rovans/yeni oda + durum rozetleri: iki varyantta da ayni
+  // paylasim metni: kazanan/kaybeden perspektifi; telepati ortak uyum yuzdesi
+  const shareMsg = isKoopTelepati(snapshot)
+    ? `Telepati testinde uyumumuz %${telepatiPct(snapshot)} çıktı! Siz de deneyin: ${GAME_URL}`
+    : iWon && opp
+      ? `Harfiyen'de ${opp.nick}'i ${scorelineOf(snapshot)} yendim! Sen de oyna: ${GAME_URL}`
+      : `Harfiyen'de kıl payı kaybettim, rövanş şart! Sen de oyna: ${GAME_URL}`;
+
+  // rovans/paylas/yeni oda + durum rozetleri: iki varyantta da ayni
   const footer = (
     <>
       {oppWants && !mineWant && (
@@ -166,6 +225,8 @@ export default function Victory() {
         >
           {mineWant ? `Rövanş istendi (${rematchWants.length}/2)` : 'Rövanş'}
         </button>
+        {/* ikincil aksiyon: rovansin altinda */}
+        <ShareButton text={shareMsg} />
         <button type="button" className="btn-candy btn-block" onClick={() => leaveRoom()}>
           Yeni oda
         </button>

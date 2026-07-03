@@ -20,6 +20,7 @@ import { Hearts, MedalDots, PLAYER_CSS, Stars, TimerBar, WinWash } from '../ui/p
 import { useRemaining, up } from '../hooks';
 import { acceptPunch, dropIn, jelly, microShake, popIn, punchIn, reducedMotion, shake, staggerIn, wobble } from '../fx/anim';
 import { burst, paletteFor } from '../fx/confetti';
+import { haptics } from '../fx/haptics';
 import { SayiPick, SayiRoundEnd, SayiTurn } from './modes/SayiGame';
 import { ZincirTurn } from './modes/ZincirGame';
 import { UzunRace, UzunReveal } from './modes/UzunGame';
@@ -253,6 +254,7 @@ function CountdownOverlay({ deadline }: { deadline: number | null }) {
     if (prev.current !== n) {
       prev.current = n;
       punchIn(ref.current);
+      haptics.tick(); // her rakamda minik tik titresimi
     }
   }, [n]);
 
@@ -548,15 +550,34 @@ export default function Game() {
   const zincirBoom = useStore((s) => s.zincirBoom);
   const lastBom = useStore((s) => s.lastBom);
   const uzunReveal = useStore((s) => s.uzunReveal);
+  const lastAccepted = useStore((s) => s.lastAccepted);
+  const lastRejected = useStore((s) => s.lastRejected);
   const rootRef = useRef<HTMLDivElement>(null);
   const prevBoomSeq = useRef(0);
   const prevBomSeq = useRef(0);
+  const prevAccSeq = useRef(lastAccepted?.seq ?? 0);
+  const prevRejSeq = useRef(lastRejected?.seq ?? 0);
   // bomba patlamasi: kisa flas + yikama (patlayan bensem toz pembe, rakipse mavi)
   const [boomFx, setBoomFx] = useState<{ mine: boolean; key: number } | null>(null);
+
+  // titresim: kabul edilen kelime
+  useEffect(() => {
+    if (!lastAccepted || lastAccepted.seq === prevAccSeq.current) return;
+    prevAccSeq.current = lastAccepted.seq;
+    haptics.accept();
+  }, [lastAccepted]);
+
+  // titresim: reddedilen kelime (harf/zincir/uzun ortak sinyal)
+  useEffect(() => {
+    if (!lastRejected || lastRejected.seq === prevRejSeq.current) return;
+    prevRejSeq.current = lastRejected.seq;
+    haptics.error();
+  }, [lastRejected]);
 
   useEffect(() => {
     if (!zincirBoom || zincirBoom.seq === prevBoomSeq.current) return;
     prevBoomSeq.current = zincirBoom.seq;
+    haptics.boom();
     shake(rootRef.current);
     const you = useStore.getState().snapshot?.you;
     setBoomFx({ mine: zincirBoom.loser !== you, key: zincirBoom.seq });
@@ -573,7 +594,11 @@ export default function Game() {
       if (lastBom.kind === 'bom') microShake(rootRef.current);
       return;
     }
-    if (lastBom.insured) return;
+    if (lastBom.insured) {
+      haptics.error(); // sigorta kurtardi: patlama yok, hata titresimi yeter
+      return;
+    }
+    haptics.boom();
     shake(rootRef.current);
     const you = useStore.getState().snapshot?.you;
     // hatayi yapan bensem toz pembe, rakipse mavi (zincir ile ayni dil)

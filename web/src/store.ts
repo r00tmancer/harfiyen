@@ -126,6 +126,10 @@ interface HarfiyenStore {
     seq: number;
   } | null;
 
+  // ---- tepkiler ----
+  // seq: her tepkide artar, balon animasyonu tam-bir-kez tetiklenir
+  lastReaction: { by: string; id: number; seq: number } | null;
+
   // ---- telepati ----
   myTelepatiChoice: string | null; // bu soruda verdigim cevap (secili buton gorseli)
   telepatiReveal: {
@@ -180,6 +184,7 @@ const roomDefaults = {
   uzunExtra: false,
   uzunLocked: null,
   uzunReveal: null,
+  lastReaction: null,
   myTelepatiChoice: null as string | null,
   telepatiReveal: null,
 };
@@ -651,6 +656,12 @@ export const useStore = create<HarfiyenStore>()((set, get) => ({
 
         case 'rematch_state':
           return { rematchWants: msg.want };
+
+        // ---- tepkiler ----
+        case 'reaction':
+          return {
+            lastReaction: { by: msg.by, id: msg.id, seq: (st.lastReaction?.seq ?? 0) + 1 },
+          };
 
         case 'opp_conn': {
           const patch: Partial<HarfiyenStore> = { oppConnected: msg.connected };

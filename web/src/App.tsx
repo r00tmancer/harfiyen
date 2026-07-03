@@ -3,6 +3,7 @@ import Home from './screens/Home';
 import Lobby from './screens/Lobby';
 import Game from './screens/Game';
 import Victory from './screens/Victory';
+import Reactions from './ui/Reactions';
 
 function ConnToast() {
   const conn = useStore((s) => s.conn);
@@ -25,6 +26,8 @@ export default function App() {
         {screen === 'game' && <Game />}
         {screen === 'victory' && <Victory />}
       </main>
+      {/* tepkiler: oda ekranlarinin tumunde (lobi, oyun, zafer) */}
+      {screen !== 'home' && <Reactions />}
       <ConnToast />
     </>
   );

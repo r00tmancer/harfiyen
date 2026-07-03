@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { apiCheckRoom, apiCreateRoom, connect } from '../net/ws';
 import { Avatar, AVATAR_NAMES, AVATAR_PICK_COLORS } from '../ui/avatars';
 import { staggerIn, dropIn } from '../fx/anim';
+import { haptics, hapticsEnabled, setHapticsEnabled } from '../fx/haptics';
 
 const LOGO = ['H', 'A', 'R', 'F', 'İ', 'Y', 'E', 'N'];
 const LOGO_COLORS = [
@@ -50,7 +51,15 @@ export default function Home() {
   const homeError = useStore((s) => s.homeError);
 
   const [joinOpen, setJoinOpen] = useState(fromLink);
+  const [vibOn, setVibOn] = useState(hapticsEnabled);
   const root = useRef<HTMLDivElement>(null);
+
+  function toggleVib() {
+    const next = !vibOn;
+    setVibOn(next);
+    setHapticsEnabled(next);
+    if (next) haptics.tick(); // acilirken minik deneme titresimi
+  }
 
   useEffect(() => {
     staggerIn(root.current);
@@ -165,6 +174,26 @@ export default function Home() {
               <Avatar index={i} color={AVATAR_PICK_COLORS[i]} size={44} />
             </button>
           ))}
+        </div>
+        {/* titresim ayari (iOS Safari titresimi desteklemez, orada sessiz kalir) */}
+        <div className="mt-5 flex items-center justify-between">
+          <span
+            id="vib-label"
+            className="font-display text-sm font-bold"
+            style={{ color: 'var(--ink-soft)' }}
+          >
+            Titreşim
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={vibOn}
+            aria-labelledby="vib-label"
+            className={`toggle-candy ${vibOn ? 'on' : ''}`}
+            onClick={toggleVib}
+          >
+            <span className="knob" aria-hidden="true" />
+          </button>
         </div>
       </div>
 

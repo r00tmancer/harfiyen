@@ -220,6 +220,28 @@ export function IconHeartSolid({ size = 16, ...props }: { size?: number } & SVGP
   );
 }
 
+// paylas: kutudan yukari ok
+export function IconShare({ size = 20, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 14.5V3.2M8.2 6.6L12 2.8l3.8 3.8" />
+      <path d="M7.5 10.5H5.7a2.2 2.2 0 0 0-2.2 2.2v6.1a2.2 2.2 0 0 0 2.2 2.2h12.6a2.2 2.2 0 0 0 2.2-2.2v-6.1a2.2 2.2 0 0 0-2.2-2.2h-1.8" />
+    </svg>
+  );
+}
+
+// gulen yuz: tepki butonu
+export function IconSmile({ size = 24, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="8.6" cy="10" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15.4" cy="10" r="1.4" fill="currentColor" stroke="none" />
+      <path d="M8 14.2q4 3.8 8 0" />
+    </svg>
+  );
+}
+
 // yukari / asagi ok: tahmin sonucu
 export function IconArrowUp({ size = 18, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
   return (

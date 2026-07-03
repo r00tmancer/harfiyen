@@ -20,6 +20,7 @@ import {
 } from '@harfiyen/shared';
 import type { ClientMsg, GameMode, RoomSnapshot, ServerMsg } from '@harfiyen/shared';
 import {
+  canReact,
   canUseJoker,
   chooseFallbackPair,
   isFrozen,
@@ -177,6 +178,7 @@ export class GameRoom extends DurableObject<Env> {
         pickedLetter: null,
         rematch: false,
         lastSubmitAt: 0,
+        lastReactAt: 0,
       };
       state.players.push(player);
       state.creator ??= player.id; // ilk katilan odayi kurar (players[0])
@@ -260,6 +262,9 @@ export class GameRoom extends DurableObject<Env> {
         break;
       case 'use_joker':
         await this.onUseJokerDispatch(state, player);
+        break;
+      case 'react':
+        await this.onReact(state, player, msg.id);
         break;
       case 'rematch':
         await this.onRematch(state, player);
@@ -422,6 +427,16 @@ export class GameRoom extends DurableObject<Env> {
     await this.save(state);
     this.broadcast({ t: 'joker_used', by: player.id, kind: 'buz', until });
     this.broadcastSnapshot(state);
+  }
+
+  // Tepki: her fazda serbest (lobby dahil). Gecersiz id veya throttle sessizce yutulur.
+  // Gonderene de yayinlanir (echo = iletim onayi).
+  private async onReact(state: RoomState, player: PlayerState, id: number): Promise<void> {
+    const now = Date.now();
+    if (!canReact(id, player.lastReactAt ?? 0, now)) return; // eski kayitlarda alan olmayabilir
+    player.lastReactAt = now;
+    await this.save(state);
+    this.broadcast({ t: 'reaction', by: player.id, id });
   }
 
   private async onRematch(state: RoomState, player: PlayerState): Promise<void> {
